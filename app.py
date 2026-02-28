@@ -4,10 +4,10 @@ import pandas as pd
 
 # 1. [데이터] 기본 회원 명단 (유명 선수 포함)
 DEFAULT_MEMBERS = (
-    "야닉 시너, 카를로스 알카라즈, 노박 조코비치, 라파엘 나달, 다닐 메드베데프, "
-    "알렉산더 즈베레프, 캐스퍼 루드, 스테파노스 치치파스, 안드레이 루블레프, 테일러 프리츠, "
-    "홀거 루네, 그리고르 디미트로프, 알렉스 드 미노, 허버트 후르카츠, 벤 쉘튼, "
-    "프란시스 티아포, 세바스티안 코르다, 펠릭스 오제 알리아심, 로저 페더러, 정현"
+"강수정,강정이,강현석,고경주,고성종,김기호,김길우,김동규,김민균,김민재,김민철,김민한,김보배,김상훈,김서영,김시우,김연중,김용석,김이섭,김재승, "
+"김재형,김주수,김주연,김지은,김지훈,김진석,김진환,김창현,김태연,김태완,김혜진,박병규,박상배,박성진,박소혜,박영순,박종진,백영훈,송미희,안경화, "
+"오영식,오은경,오창호,이도현,이례아,이상덕,이상우,이수아,이유석,이준,이채임,이풍영,임장영,전정민,정대성,정영철,정주석,조진훈,최민숙,최영주, "
+"최원영,최은선,최은애,최재영,최학철,최헌영,한주현,한희진,홍상혁"
 )
 
 # 2. 대진표 데이터베이스 (AA, AB, TEAM 통합)
@@ -84,26 +84,20 @@ st.set_page_config(page_title="서울산 테니스클럽", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. [수정] 테이블 중앙 정렬 및 ● 기호 가시성 극대화 */
+    /* 1. 테이블 중앙 정렬 및 ● 기호 가시성 극대화 */
     .stTable td, .stTable th { 
         text-align: center !important; 
         vertical-align: middle !important; 
-        font-size: 17px !important; /* 표 전체 글자 크기 상향 */
-        color: #000000 !important; /* 글자색 완전 검정으로 또렷하게 */
+        font-size: 17px !important; 
+        color: #000000 !important; 
     }
-    
-    /* ● 기호를 포함한 테이블 셀의 텍스트를 더 굵고 크게 강조 */
-    .stTable td {
-        font-weight: 700 !important;
-        line-height: 1.2 !important;
-    }
+    .stTable td { font-weight: 700 !important; line-height: 1.2 !important; }
 
     /* 2. 좌측 사이드바 설정 (글자 크기 및 너비) */
     section[data-testid="stSidebar"] { width: 350px !important; }
     section[data-testid="stSidebar"] .stText, 
     section[data-testid="stSidebar"] .stMarkdown p { font-size: 16px !important; line-height: 1.5; }
-    section[data-testid="stSidebar"] h2, 
-    section[data-testid="stSidebar"] h3 { font-size: 20px !important; font-weight: bold; }
+    section[data-testid="stSidebar"] h2, h3 { font-size: 20px !important; font-weight: bold; }
     section[data-testid="stSidebar"] label p { font-size: 15px !important; font-weight: 600; }
 
     /* 3. 선택된 선수 이름 태그 (파란색) */
@@ -111,22 +105,18 @@ st.markdown("""
         background-color: #1E88E5 !important; 
         color: white !important; 
         border-radius: 5px !important;
-        font-weight: 700 !important; /* 이름도 더 또렷하게 */
+        font-weight: 700 !important;
     }
     span[data-baseweb="tag"] svg { fill: white !important; }
 
-    /* 4. 그룹(익스팬더) 카드 디자인 - 구분력 강화 핵심 */
+    /* 4. 그룹(익스팬더) 카드 디자인 - 구분력 강화 */
     .streamlit-expanderHeader {
         border: 2px solid #D1D5DB !important;
         border-radius: 12px 12px 0 0 !important;
         background-color: #F3F4F6 !important;
         padding: 12px 18px !important;
     }
-    .streamlit-expanderHeader p {
-        font-size: 18px !important;
-        font-weight: 800 !important;
-        color: #111827 !important;
-    }
+    .streamlit-expanderHeader p { font-size: 18px !important; font-weight: 800 !important; color: #111827 !important; }
     .streamlit-expanderContent { 
         background-color: #FFFFFF !important; 
         border: 6px solid #E5E7EB !important; 
@@ -172,13 +162,36 @@ st.markdown("""
     }
     .stTable thead tr th { background-color: #2E7D32 !important; color: white !important; font-weight: 800 !important; }
     
+    /* 9. [추가] 그룹별 헤더 타이틀 박스 디자인 */
+    .group-header-box {
+        background-color: #f1f8f1 !important; 
+        padding: 12px 18px !important; 
+        border-radius: 10px !important; 
+        border-left: 8px solid #2E7D32 !important; 
+        margin: 20px 0px 15px 0px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.05) !important;
+    }
+    .group-header-title {
+        font-size: 19px !important; 
+        font-weight: 800 !important; 
+        color: #1B5E20 !important; 
+        letter-spacing: -0.5px !important;
+    }
+    .group-header-mode {
+        font-size: 15px !important; 
+        color: #666 !important; 
+        font-weight: 500 !important;
+    }
+
     /* 입력창 여백 보정 */
     div[data-testid="stNumberInput"] { margin-top: -10px !important; margin-bottom: -10px !important; }
     hr { margin: 5px 0px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='font-size: 26px; text-align: left;'>🎾 서울산 테니스클럽 대회 운영 시스템</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 20px; text-align: left;'>🎾 서울산 테니스클럽 대회 운영 시스템</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("⚙️ 시스템 설정")
@@ -217,7 +230,8 @@ global_used_individuals = set()
 
 for i in range(1, num_groups + 1):
     with st.expander(f"📍 {i}그룹 명단 확정", expanded=True):
-        col_cfg, col_select = st.columns([1, 4])
+        # 기존 [1, 4]에서 [0.8, 4.2] 정도로 비율 조정 (더 슬림하게)
+        col_cfg, col_select = st.columns([0.6, 4.4])
         with col_cfg:
             g_mode = st.selectbox("방식", ["한울 AA (개인)", "한울 AB (혼복/그룹)", "한울 TEAM (팀전)"], key=f"md_{i}")
             if "AA" in g_mode: p_target = st.number_input(f"인원(5~16)", 5, 16, 10, key=f"target_{i}")
@@ -265,8 +279,17 @@ if st.session_state.get("generated"):
     display_data = st.session_state["current_group_data"]
     
     for g_id, data in display_data.items():
-        st.header(f"🏆 {g_id}그룹 경기 운영 상황 ({data['mode']})")
-        
+
+        # 기존 st.header 자리에 넣을 코드
+        st.markdown(f"""
+            <div class="group-header-box">
+                <span style="font-size: 20px; margin-right: 12px;">🏆</span>
+                <span class="group-header-title">
+                    {g_id}그룹 경기 운영 상황 <span class="group-header-mode">| {data['mode']}</span>
+                </span>
+            </div>
+        """, unsafe_allow_html=True)
+
         # 모드별 대진 데이터 선택
         if "AA" in data['mode']: raw = HANUL_AA_DATA.get(data['count'])
         elif "AB" in data['mode']: raw = HANUL_AB_DATA.get(data['count'])
