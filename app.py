@@ -127,10 +127,10 @@ st.markdown("""
         padding: 25px !important;
     }
 
-    /* 5. 설정 열(왼쪽 카드) 디자인 보강 및 폭 최소화 여백 조정 */
+    /* 5. 설정 열(왼쪽 카드) 디자인 보강 */
     [data-testid="column"]:nth-of-type(1) [data-testid="stVerticalBlock"] { 
         background-color: #F9FAFB !important; 
-        padding: 12px !important; /* 패딩 축소로 폭 최적화 */
+        padding: 20px !important; 
         border-radius: 12px !important; 
         border: 2px solid #E5E7EB !important;
         border-left: 14px solid #2E7D32 !important; 
@@ -162,7 +162,7 @@ st.markdown("""
     }
     .stTable thead tr th { background-color: #2E7D32 !important; color: white !important; font-weight: 800 !important; }
     
-    /* 9. 그룹별 헤더 타이틀 박스 디자인 */
+    /* 9. [추가] 그룹별 헤더 타이틀 박스 디자인 */
     .group-header-box {
         background-color: #f1f8f1 !important; 
         padding: 12px 18px !important; 
@@ -197,10 +197,10 @@ st.markdown("""
     /* 11. [추가] 경기 시작 버튼(전체 대진표 작성) 강력 강조 */
     div.stButton > button {
         width: 100% !important; 
-        height: 65px !important; 
+        height: 55px !important; 
         background-color: #2E7D32 !important; 
         color: white !important; 
-        font-size: 24px !important; 
+        font-size: 28px !important; 
         font-weight: 900 !important; 
         border-radius: 15px !important; 
         border: 2px solid #1B5E20 !important; 
@@ -212,15 +212,15 @@ st.markdown("""
         background-color: #1B5E20 !important; 
         transform: translateY(2px) !important;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
-    }
+    }    
 
     /* 입력창 여백 보정 */
-    div[data-testid="stNumberInput"] { margin-top: -10px !important; margin-bottom: -10px !important; }
+    div[data-testid="stNumberInput"] { margin-top: -5px !important; margin-bottom: -5px !important; }
     hr { margin: 5px 0px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='font-size: 18px; text-align: left;'>🎾 서울산 테니스클럽 대회 운영 시스템</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 19px; text-align: left;'>🎾 서울산 테니스클럽 대회 운영 시스템</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("⚙️ 시스템 설정")
