@@ -8,23 +8,40 @@ import plotly.express as px
 # 페이지 설정
 st.set_page_config(page_title="테니스 볼 관리자", layout="wide")
 
-# 테마 및 모바일 대응 CSS
+# 테마 및 모바일 대응 CSS (상단 여백 수정)
 st.markdown("""
     <style>
+    /* 1. 상단 여백(Padding) 확보: 제목 잘림 방지 */
+    .block-container {
+        padding-top: 3.5rem !important; 
+        padding-bottom: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
     .main { background-color: #F1F8E9; }
+    
+    /* 제목 스타일 */
     .main-title {
-        font-size: 24px !important;
+        font-size: 26px !important;
         color: #2E7D32;
         font-weight: bold;
         text-align: center;
-        margin-bottom: 20px;
+        margin-top: 0px;
+        margin-bottom: 25px;
+        line-height: 1.2;
     }
+    
     .stButton>button { 
         background-color: #2E7D32; color: white; border-radius: 10px; 
         font-weight: bold; width: 100%;
     }
-    h1, h2, h3 { color: #2E7D32; }
+    h1, h2, h3 { color: #2E7D32; margin-top: 10px; margin-bottom: 5px; }
     [data-testid="stMetricValue"] { color: #EF6C00; }
+    
+    /* 모바일에서 탭 글자 크기 조절 */
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stWidgetLabel"] p {
+        font-size: 16px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -61,6 +78,7 @@ def load_members():
 
 init_db()
 
+# 상단 제목 표시
 st.markdown('<p class="main-title">🎾 테니스 볼 사용 기록기</p>', unsafe_allow_html=True)
 
 with st.sidebar:
@@ -97,36 +115,36 @@ with st.container():
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         target_member = st.selectbox(
-            "회원 선택 (입력 가능)", 
+            "이름 선택 (입력 가능)", 
             members_list, 
             index=None, 
-            placeholder="이름을 선택해 주세요"
+            placeholder="회원 선택"
         )
     with col2:
         target_date = st.date_input("날짜", date.today())
     with col3:
         target_qty = st.number_input("수량", min_value=0, value=0, step=1)
 
-    if st.button("🔥 사용 기록 저장"):
+    if st.button("🔥 기록 저장"):
         if target_member:
             conn = get_connection()
             conn.execute("INSERT INTO usage (member, date, quantity) VALUES (?, ?, ?)", 
                          (target_member, str(target_date), int(target_qty)))
             conn.commit()
             conn.close()
-            st.success(f"{target_member}님 기록 완료!")
+            st.success(f"{target_member}님 완료!")
             st.rerun()
         else:
-            st.warning("먼저 이름을 선택해 주세요.")
+            st.warning("이름을 선택해 주세요.")
 
 st.divider()
 
-tab1, tab2 = st.tabs(["📊 통계 및 그래프", "📝 기록 수정/삭제"])
+tab1, tab2 = st.tabs(["📊 통계 및 그래프", "📝 기록 수정"])
 
 with tab1:
     df_all = load_all_data()
     if df_all.empty:
-        st.info("기록이 없습니다. 첫 데이터를 입력해 보세요!")
+        st.info("기록이 없습니다.")
     else:
         monthly_summary = df_all.groupby(['연월_정렬', '연월_표시'])['quantity'].sum().reset_index()
         monthly_summary = monthly_summary.sort_values('연월_정렬')
@@ -134,92 +152,85 @@ with tab1:
         col_a, col_b = st.columns([1, 2])
         
         with col_a:
-            st.subheader("개인별 상세 통계")
+            st.subheader("개인 통계")
             stat_member = st.selectbox(
-                "누구의 기록을 볼까요?", 
+                "조회할 이름", 
                 members_list, 
                 index=None, 
-                placeholder="💡 이름을 선택하세요"
+                placeholder="💡 이름 선택"
             )
             
-            st.divider()
-
             if stat_member:
                 df_stat = df_all[df_all['member'] == stat_member]
                 if not df_stat.empty:
                     current_month = date.today().strftime('%Y-%m')
                     this_month_qty = df_stat[df_stat['연월_정렬'] == current_month]['quantity'].sum()
                     total_qty = df_stat['quantity'].sum()
-                    st.success(f"**{stat_member}** 님의 현황")
-                    st.metric("이번 달 총 사용", f"{this_month_qty} 개")
-                    st.metric("전체 누적 사용", f"{total_qty} 개")
-                else:
-                    st.info(f"{stat_member} 님의 데이터가 없습니다.")
+                    st.metric("이번 달", f"{this_month_qty} 개")
+                    st.metric("전체 누적", f"{total_qty} 개")
             else:
-                st.info("👆 위 목록에서 **이름**을 선택하면 개인별 사용 통계를 확인할 수 있습니다.")
+                st.info("👆 위에서 이름을 선택하세요.")
             
-            st.divider()
-            st.subheader("🗓️ 월별 전체 합계")
+            st.subheader("🗓️ 월별 합계")
             summary_display = monthly_summary.sort_values('연월_정렬', ascending=False)
             st.table(summary_display.rename(columns={'연월_표시': '날짜', 'quantity': '합계'})[['날짜', '합계']].set_index('날짜'))
 
         with col_b:
-            st.subheader("📊 일별 상세 기록")
+            st.subheader("📊 일별 기록")
             df_day = df_all.groupby(['date', 'member'])['quantity'].sum().reset_index()
             df_day = df_day.sort_values('date')
-            df_day['date_str'] = df_day['date'].dt.strftime('%Y-%m-%d')
+            df_day['date_str'] = df_day['date'].dt.strftime('%m-%d')
             
             fig_day = px.bar(df_day, x='date_str', y='quantity', color='member', 
-                             barmode='group', text='quantity')
+                             barmode='group', text='quantity', height=280)
             
             fig_day.update_traces(
                 textposition='outside', 
-                textfont=dict(size=18, family="Arial Black", color="black"),
+                textfont=dict(size=14, family="Arial Black", color="black"),
                 cliponaxis=False
             )
             
             fig_day.update_layout(
-                xaxis_title="날짜", yaxis_title="수량", 
-                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': df_day['date_str'].unique(), 'fixedrange': True}, # 🔥 줌 방지
-                yaxis={'fixedrange': True}, # 🔥 줌 방지
-                bargap=0.6, 
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14),
-                dragmode=False # 🔥 드래그 비활성화
+                xaxis_title=None, yaxis_title=None, 
+                xaxis={'type': 'category', 'fixedrange': True},
+                yaxis={'fixedrange': True},
+                bargap=0.4, 
+                margin=dict(l=10, r=10, t=30, b=10),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                dragmode=False,
+                showlegend=False # 모바일 공간 확보를 위해 범례 숨김 (바 색상으로 구분 가능)
             )
-            st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False}) # 🔥 툴바 숨김
+            st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False})
             
-            st.subheader("📈 월간 사용 추이")
-            fig_month = px.line(monthly_summary, x='연월_표시', y='quantity', markers=True, text='quantity')
+            st.subheader("📈 월간 추이")
+            fig_month = px.line(monthly_summary, x='연월_표시', y='quantity', markers=True, text='quantity', height=240)
             fig_month.update_traces(
-                line_color='#2E7D32', marker=dict(size=12), 
+                line_color='#2E7D32', marker=dict(size=10), 
                 textposition="top center", 
-                textfont=dict(size=18, family="Arial Black", color="black")
+                textfont=dict(size=14, family="Arial Black", color="black")
             )
             fig_month.update_layout(
-                xaxis_title="연월", yaxis_title="총 수량",
-                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': monthly_summary['연월_표시'].unique(), 'fixedrange': True}, # 🔥 줌 방지
-                yaxis={'fixedrange': True}, # 🔥 줌 방지
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14),
-                dragmode=False # 🔥 드래그 비활성화
+                xaxis_title=None, yaxis_title=None,
+                xaxis={'type': 'category', 'fixedrange': True},
+                yaxis={'fixedrange': True},
+                margin=dict(l=10, r=10, t=30, b=10),
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                dragmode=False
             )
-            st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False}) # 🔥 툴바 숨김
+            st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False})
 
 with tab2:
-    st.subheader("데이터 수정 및 삭제")
+    st.subheader("기록 수정/삭제")
     df_raw = load_all_data()
-
     if not df_raw.empty:
         df_edit = df_raw.copy()
         df_edit['date'] = df_edit['date'].dt.date
-        df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True])
-        df_edit = df_edit.reset_index(drop=True)
-        
+        df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
         edited_df = st.data_editor(df_edit[['member', 'date', 'quantity']], num_rows="dynamic", key="data_editor", hide_index=True)
 
-        if st.button("💾 모든 변경사항 저장"):
+        if st.button("💾 저장하기"):
             final_df = edited_df.dropna(subset=['member', 'date'])
             final_df = final_df[final_df['member'].astype(str).str.strip() != ""] 
-
             conn = get_connection()
             try:
                 conn.execute("DELETE FROM usage")
@@ -228,20 +239,15 @@ with tab2:
                     save_df['date'] = save_df['date'].astype(str)
                     save_df.to_sql("usage", conn, if_exists="append", index=False)
                 conn.commit()
-                st.success("데이터가 업데이트되었습니다.")
+                st.success("업데이트 완료!")
                 st.rerun()
             except Exception as e:
-                st.error(f"저장 중 오류 발생: {e}")
+                st.error(f"오류: {e}")
             finally:
                 conn.close()
     else:
-        st.info("수정할 기록이 없습니다.")
+        st.info("기록이 없습니다.")
 
 if not df_raw.empty:
     csv_data = df_raw.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 전체 데이터 내보내기 (CSV)",
-        data=csv_data,
-        file_name=f"tennis_ball_{date.today()}.csv",
-        mime="text/csv",
-    )
+    st.download_button("📥 CSV 내보내기", data=csv_data, file_name=f"tennis_{date.today()}.csv", mime="text/csv")
