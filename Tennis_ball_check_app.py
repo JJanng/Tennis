@@ -68,7 +68,7 @@ with st.sidebar:
     is_admin = st.checkbox("관리자 모드 활성화")
     if is_admin:
         admin_pwd = st.text_input("비밀번호", type="password")
-        if admin_pwd == "1234" or admin_pwd == "":
+        if admin_pwd == "2612":
             st.success("인증 성공")
             with st.expander("회원 관리"):
                 new_member = st.text_input("새 회원 이름")
