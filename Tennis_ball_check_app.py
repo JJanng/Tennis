@@ -12,7 +12,6 @@ st.set_page_config(page_title="테니스 볼 관리자", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #F1F8E9; }
-    /* 타이틀 크기 조절: 모바일에서 줄바꿈 방지 */
     .main-title {
         font-size: 24px !important;
         color: #2E7D32;
@@ -62,7 +61,6 @@ def load_members():
 
 init_db()
 
-# 직관적인 제목으로 수정 및 크기 최적화
 st.markdown('<p class="main-title">🎾 테니스 볼 사용 기록기</p>', unsafe_allow_html=True)
 
 with st.sidebar:
@@ -99,7 +97,7 @@ with st.container():
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         target_member = st.selectbox(
-            "회원 선택", 
+            "회원 선택 (입력 가능)", 
             members_list, 
             index=None, 
             placeholder="이름을 선택해 주세요"
@@ -182,11 +180,13 @@ with tab1:
             
             fig_day.update_layout(
                 xaxis_title="날짜", yaxis_title="수량", 
-                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': df_day['date_str'].unique()},
+                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': df_day['date_str'].unique(), 'fixedrange': True}, # 🔥 줌 방지
+                yaxis={'fixedrange': True}, # 🔥 줌 방지
                 bargap=0.6, 
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14)
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14),
+                dragmode=False # 🔥 드래그 비활성화
             )
-            st.plotly_chart(fig_day, width='stretch')
+            st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False}) # 🔥 툴바 숨김
             
             st.subheader("📈 월간 사용 추이")
             fig_month = px.line(monthly_summary, x='연월_표시', y='quantity', markers=True, text='quantity')
@@ -197,10 +197,12 @@ with tab1:
             )
             fig_month.update_layout(
                 xaxis_title="연월", yaxis_title="총 수량",
-                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': monthly_summary['연월_표시'].unique()},
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14)
+                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': monthly_summary['연월_표시'].unique(), 'fixedrange': True}, # 🔥 줌 방지
+                yaxis={'fixedrange': True}, # 🔥 줌 방지
+                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(size=14),
+                dragmode=False # 🔥 드래그 비활성화
             )
-            st.plotly_chart(fig_month, width='stretch')
+            st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False}) # 🔥 툴바 숨김
 
 with tab2:
     st.subheader("데이터 수정 및 삭제")
