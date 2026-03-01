@@ -247,13 +247,29 @@ with col_b:
             df_day = df_day.sort_values('date')
             df_day['date_str'] = df_day['date'].dt.strftime('%m-%d')
             
-            # 데이터 개수에 따른 동적 설정 계산
+            # 데이터 개수에 따른 동적 설정 계산 (X축)
             num_unique_days = len(df_day['date_str'].unique())
             dynamic_font_size = 16 if num_unique_days <= 5 else 12
             dynamic_bargap = 0.7 if num_unique_days <= 2 else 0.3
 
+            # --- Y축 동적 눈금(dtick) 계산 추가 ---
+            if not df_day.empty:
+                max_day_val = df_day['quantity'].max()
+                if max_day_val <= 5:
+                    day_dtick = 1
+                elif max_day_val <= 15:
+                    day_dtick = 2
+                elif max_day_val <= 30:
+                    day_dtick = 5
+                else:
+                    day_dtick = 10
+                day_y_range = [0, max_day_val * 1.2] # 상단 여백 확보
+            else:
+                day_dtick = 1
+                day_y_range = [0, 10]
+
             fig_day = px.bar(df_day, x='date_str', y='quantity', color='member', 
-                             barmode='group', text='quantity', height=320)
+                            barmode='group', text='quantity', height=320)
             
             fig_day.update_traces(
                 textposition='outside', 
@@ -271,7 +287,8 @@ with col_b:
                 },
                 yaxis={
                     'fixedrange': True, 
-                    'dtick': 1, 
+                    'dtick': day_dtick,       # 계산된 동적 눈금 적용
+                    'range': day_y_range,     # 동적 범위 적용
                     'gridcolor': '#DCDCDC',
                     'showgrid': True
                 },
@@ -284,14 +301,10 @@ with col_b:
                 legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, title=None)
             )
 
-            # 1. 일별 기록 차트 부분
             st.plotly_chart(
                 fig_day, 
-                width='stretch',  # 최신 가이드라인 반영
-                config={
-                    'displayModeBar': False, 
-                    'scrollZoom': False,  # 터치 줌 방지로 스크롤 간섭 최소화
-                }
+                width='stretch', 
+                config={'displayModeBar': False, 'scrollZoom': False}
             )
           
             st.subheader("📈 월간 추이")
