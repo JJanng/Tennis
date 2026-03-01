@@ -175,11 +175,25 @@ with st.container():
 
     with col2:
         target_date = st.date_input("날짜", date.today())
+
     with col3:
-        target_qty = st.number_input("수량", min_value=0, value=0, step=1, format="%d")
+        # 모든 인자를 정수(0, 1)로 설정하여 소수점 모드(0.0)를 완전히 차단합니다.
+        target_qty = st.number_input(
+            "수량", 
+            min_value=0,    # 0.0이 아닌 0으로 설정
+            value=0,        # 초기 표시값을 0으로 설정
+            step=1,         # 증감 단위를 1로 설정
+            format="%d"     # 표시 형식을 정수(%d)로 강제
+        )
+
+    # --- 입력값 검증 로직 추가 ---
+    # 사용자가 타이핑 중 소수점 등을 섞어 넣으면 float로 인식될 수 있으므로 체크합니다.
+    is_valid_qty = isinstance(target_qty, int)
 
     if st.button("🟡 테니스 볼 사용량 저장"):
-        if target_member and str(target_member).strip():
+        if not is_valid_qty:
+            st.error("⚠️ 수량은 정수(0, 1, 2...)로만 입력해 주세요!")
+        elif target_member and str(target_member).strip():
             save_name = str(target_member).strip()
             conn = get_connection()
             conn.execute("INSERT INTO usage (member, date, quantity) VALUES (?, ?, ?)", 
