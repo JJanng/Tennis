@@ -20,7 +20,7 @@ st.markdown("""
     .main { background-color: #F1F8E9; }
     
     .main-title {
-        font-size: 22px !important;
+        font-size: 26px !important;
         color: #2E7D32;
         font-weight: bold;
         text-align: center;
@@ -64,6 +64,20 @@ st.markdown("""
     .stButton>button:hover {
         background-color: #1B5E20;
         border: 2px solid #A5D6A7;
+    }
+            
+    /* 기존 CSS 안에 추가 */
+    iframe[title="plotly.graph_objs._figure.Figure"] {
+        touch-action: pan-y !important;
+    }
+
+    .js-plotly-plot .plotly .nsewdrag {
+        touch-action: pan-y !important;
+    }
+    /* 차트 영역 자체에서 발생하는 모든 터치 간섭을 최소화 */
+    .js-plotly-plot .plotly .draglayer {
+        pointer-events: all;
+        touch-action: pan-y !important;
     }
     </style>
     """, unsafe_allow_html=True)
