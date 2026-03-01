@@ -256,56 +256,73 @@ with col_b:
             st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False})
             
             st.subheader("📈 월간 추이")
-            # 데이터 로드 및 정렬 확인
+            # 데이터 정렬 확인
             monthly_display = monthly_summary.sort_values('연월_정렬')
             
+            if not monthly_display.empty:
+                # 1. 최대 수량에 따른 적절한 그리드 간격(dtick) 계산
+                max_val = monthly_display['quantity'].max()
+                if max_val <= 10:
+                    dynamic_dtick = 1
+                elif max_val <= 20:
+                    dynamic_dtick = 2
+                elif max_val <= 30:
+                    dynamic_dtick = 5
+                else:
+                    dynamic_dtick = 10
+                
+                # Y축 범위도 글자가 안 잘리게 최대값보다 25% 정도 더 높게 설정
+                y_range = [0, max_val * 1.25]
+            else:
+                dynamic_dtick = 1
+                y_range = [0, 10]
+
             fig_month = px.line(monthly_display, x='연월_표시', y='quantity', 
-                                markers=True, text='quantity', height=300)
+                                markers=True, text='quantity', height=320)
             
             fig_month.update_traces(
                 line_color='#2E7D32', 
                 line_width=3,
                 marker=dict(size=12, symbol="circle", color="#2E7D32", line=dict(width=2, color="white")), 
                 textposition="top center", 
-                textfont=dict(size=14, family="Arial Black", color="black")
+                cliponaxis=False, # 글자 잘림 방지
+                textfont=dict(size=15, family="Arial Black", color="black")
             )
             
             fig_month.update_layout(
                 xaxis_title=None, 
-                # 1. Y축 제목 추가
                 yaxis_title="사용량(개)",
                 xaxis={
                     'type': 'category', 
                     'fixedrange': True,
                     'tickfont': {'size': 14, 'family': "Arial Black"},
                     'showgrid': False,
-                    # 2. X축 하단 라인(프레임 일부) 설정
                     'showline': True,
                     'linewidth': 2,
                     'linecolor': '#A5D6A7',
-                    'mirror': True  # 사각형 프레임 완성
+                    'mirror': True
                 },
                 yaxis={
                     'fixedrange': True, 
                     'showgrid': True,
-                    'dtick': 1,
+                    'dtick': dynamic_dtick,   # 계산된 동적 간격 적용
                     'gridcolor': '#DCDCDC',
                     'gridwidth': 1,
                     'griddash': 'dot',
                     'zeroline': True,
                     'zerolinecolor': '#A5D6A7',
-                    # 2. Y축 왼쪽 라인(프레임 일부) 설정
                     'showline': True,
                     'linewidth': 2,
                     'linecolor': '#A5D6A7',
-                    'mirror': True  # 사각형 프레임 완성
+                    'mirror': True,
+                    'range': y_range          # 동적 범위 적용
                 },
-                margin=dict(l=10, r=10, t=30, b=10),
+                margin=dict(l=10, r=10, t=60, b=10), # 상단 여백 넉넉히 유지
                 paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(255,255,255,0.5)', # 그리드와 프레임이 더 잘 보이도록 배경 불투명도 조절
+                plot_bgcolor='rgba(255,255,255,0.5)',
                 dragmode=False
             )
-            # 최신 사양인 width='stretch' 적용
+            
             st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False})
 
 with tab2:
