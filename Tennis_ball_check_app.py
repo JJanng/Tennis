@@ -266,9 +266,17 @@ with col_b:
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, title=None)
             )
-            # width='stretch'로 변경
-            st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False})
-            
+
+            # 1. 일별 기록 차트 부분
+            st.plotly_chart(
+                fig_day, 
+                width='stretch',  # 최신 가이드라인 반영
+                config={
+                    'displayModeBar': False, 
+                    'scrollZoom': False,  # 터치 줌 방지로 스크롤 간섭 최소화
+                }
+            )
+          
             st.subheader("📈 월간 추이")
             # 데이터 정렬 확인
             monthly_display = monthly_summary.sort_values('연월_정렬')
@@ -277,13 +285,13 @@ with col_b:
                 # 1. 최대 수량에 따른 적절한 그리드 간격(dtick) 계산
                 max_val = monthly_display['quantity'].max()
                 if max_val <= 10:
-                    dynamic_dtick = 1
-                elif max_val <= 20:
                     dynamic_dtick = 2
-                elif max_val <= 30:
+                elif max_val <= 20:
                     dynamic_dtick = 5
-                else:
+                elif max_val <= 30:
                     dynamic_dtick = 10
+                else:
+                    dynamic_dtick = 20
                 
                 # Y축 범위도 글자가 안 잘리게 최대값보다 25% 정도 더 높게 설정
                 y_range = [0, max_val * 1.25]
@@ -337,7 +345,15 @@ with col_b:
                 dragmode=False
             )
             
-            st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False})
+            # 2. 월간 추이 차트 부분도 동일하게 적용
+            st.plotly_chart(
+                fig_month, 
+                width='stretch',  # 최신 가이드라인 반영
+                config={
+                    'displayModeBar': False, 
+                    'scrollZoom': False
+                }
+            )
 
 with tab2:
     if st.session_state['authenticated']:
