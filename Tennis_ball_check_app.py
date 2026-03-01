@@ -176,7 +176,7 @@ with st.container():
     with col2:
         target_date = st.date_input("날짜", date.today())
     with col3:
-        target_qty = st.number_input("수량", min_value=0, value=0, step=1)
+        target_qty = st.number_input("수량", min_value=0, value=0, step=1, format="%d")
 
     if st.button("🟡 테니스 볼 사용량 저장"):
         if target_member and str(target_member).strip():
