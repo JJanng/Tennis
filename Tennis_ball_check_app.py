@@ -302,15 +302,20 @@ with col_b:
                     showlegend=True,
                     # --- 범례(Legend) 설정 수정 ---
                     legend=dict(
-                        orientation="h",      # 가로 나열
-                        yanchor="bottom", 
-                        y=1.02,               # 차트 바로 위 배치
-                        xanchor="left",       # 왼쪽부터 채우기
-                        x=0,                  # 왼쪽 정렬
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=-0.05,            # 왼쪽으로 살짝 더 밀어서 공간을 더 확보 (음수값 활용)
                         title=None,
-                        font=dict(size=11),   # 글자 크기를 살짝 줄여 더 많이 들어가게 함
-                        entrywidthmode="fraction", # 너비를 비율로 설정
-                        entrywidth=0.2        # 0.2로 설정하면 한 줄에 최대 5개(1/5)까지 배치
+                        font=dict(size=11), # 글자 크기를 10으로 줄여 잘림 방지
+                        
+                        # 고정 비율(entrywidth) 대신 가로 간격을 직접 조절합니다.
+                        itemwidth=30,       # 범례 아이콘(색상박스) 너비 축소
+                        itemsizing="constant",
+                        
+                        # 항목 사이의 여백을 조절 (열을 늘리는 핵심)
+                        # entrywidth를 지우면 이름 길이에 맞춰 다닥다닥 붙게 됩니다.
                     )
                 )
 
