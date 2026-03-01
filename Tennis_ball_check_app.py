@@ -279,7 +279,7 @@ with col_b:
             
             fig_day.update_layout(
                 xaxis_title=None, 
-                yaxis_title="사용량(개)",
+                yaxis_title=None,
                 xaxis={
                     'type': 'category', 
                     'fixedrange': True,
@@ -290,7 +290,8 @@ with col_b:
                     'dtick': day_dtick,       # 계산된 동적 눈금 적용
                     'range': day_y_range,     # 동적 범위 적용
                     'gridcolor': '#DCDCDC',
-                    'showgrid': True
+                    'showgrid': True,
+                    'title': None      # 내부 title 속성도 확실히 제거
                 },
                 bargap=dynamic_bargap,
                 margin=dict(l=10, r=10, t=40, b=10),
@@ -343,7 +344,7 @@ with col_b:
             
             fig_month.update_layout(
                 xaxis_title=None, 
-                yaxis_title="사용량(개)",
+                yaxis_title=None,
                 xaxis={
                     'type': 'category', 
                     'fixedrange': True,
@@ -367,9 +368,10 @@ with col_b:
                     'linewidth': 2,
                     'linecolor': '#A5D6A7',
                     'mirror': True,
-                    'range': y_range          # 동적 범위 적용
+                    'range': y_range,          # 동적 범위 적용
+                    'title': None      # 내부 title 속성도 확실히 제거
                 },
-                margin=dict(l=10, r=10, t=60, b=10), # 상단 여백 넉넉히 유지
+                margin=dict(l=5, r=10, t=60, b=10), # 상단 여백 넉넉히 유지
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(255,255,255,0.5)',
                 dragmode=False,
