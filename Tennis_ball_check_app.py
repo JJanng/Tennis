@@ -46,39 +46,41 @@ st.markdown("""
         border-radius: 12px; 
         font-weight: bold; 
         width: 120%; 
-        
-        /* 버튼 높이 조절 (기존 3.5rem -> 3.0rem으로 축소) */
         height: 3.0rem !important; 
-        
-        /* 글자 크기 조절 (기존 18px -> 30px로 확대) */
         font-size: 30px !important;
-        
-        /* 글자가 버튼 중앙에 잘 오도록 정렬 */
         display: flex;
         align-items: center;
         justify-content: center;
         margin-top: 10px;
     }
     
-    /* 버튼에 마우스를 올렸을 때 효과 (선택 사항) */
     .stButton>button:hover {
         background-color: #1B5E20;
         border: 2px solid #A5D6A7;
     }
-            
-    /* 기존 CSS 안에 추가 */
+
+    /* --- 모바일 차트 드래그 해결 핵심 CSS --- */
+    
+    /* 1. Plotly가 렌더링되는 iframe의 세로 스크롤 허용 */
     iframe[title="plotly.graph_objs._figure.Figure"] {
         touch-action: pan-y !important;
     }
 
+    /* 2. 차트를 덮고 있는 투명 드래그 레이어 무력화 (가장 중요) */
+    /* pointer-events: none은 터치가 차트를 통과하여 배경(스크롤)에 전달되게 합니다. */
+    .js-plotly-plot .plotly .draglayer,
     .js-plotly-plot .plotly .nsewdrag {
+        pointer-events: none !important;
         touch-action: pan-y !important;
     }
-    /* 차트 영역 자체에서 발생하는 모든 터치 간섭을 최소화 */
-    .js-plotly-plot .plotly .draglayer {
-        pointer-events: all;
-        touch-action: pan-y !important;
+
+    /* 3. 데이터 포인트(바, 라인) 클릭 툴팁은 작동하도록 복구 */
+    .js-plotly-plot .plotly .points,
+    .js-plotly-plot .plotly .barlayer,
+    .js-plotly-plot .plotly .lineLayer {
+        pointer-events: all !important;
     }
+    
     </style>
     """, unsafe_allow_html=True)
 
@@ -263,6 +265,7 @@ with col_b:
                 margin=dict(l=10, r=10, t=40, b=10),
                 paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                 dragmode=False,
+                hovermode='x unified',
                 showlegend=True,
                 legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, title=None)
             )
@@ -342,7 +345,8 @@ with col_b:
                 margin=dict(l=10, r=10, t=60, b=10), # 상단 여백 넉넉히 유지
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(255,255,255,0.5)',
-                dragmode=False
+                dragmode=False,
+                hovermode='x unified'
             )
             
             # 2. 월간 추이 차트 부분도 동일하게 적용
