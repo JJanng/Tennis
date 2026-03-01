@@ -326,28 +326,40 @@ with col_b:
             )
           
             st.subheader("📈 월간 추이")
-            # 데이터 정렬 확인
-            monthly_display = monthly_summary.sort_values('연월_정렬')
+            # 데이터 정렬 확인 및 X축 형식 변경
+            monthly_display = monthly_summary.sort_values('연월_정렬').copy()
             
             if not monthly_display.empty:
+                # X축 표시 형식을 '26/02 형태로 변경
+                # '연월_정렬'은 '2026-02' 형식이므로 이를 슬라이싱하여 변환합니다.
+                monthly_display['short_date'] = monthly_display['연월_정렬'].apply(
+                    lambda x: f"'{x[2:4]}/{x[5:7]}"
+                )
+
+                # 데이터 수에 따른 동적 글자 크기 계산
+                num_months = len(monthly_display)
+                if num_months <= 6:
+                    month_font_size = 14
+                elif num_months <= 12:
+                    month_font_size = 12
+                else:
+                    month_font_size = 10
+
                 # 1. 최대 수량에 따른 적절한 그리드 간격(dtick) 계산
                 max_val = monthly_display['quantity'].max()
-                if max_val <= 10:
-                    dynamic_dtick = 2
-                elif max_val <= 20:
-                    dynamic_dtick = 5
-                elif max_val <= 30:
-                    dynamic_dtick = 10
-                else:
-                    dynamic_dtick = 20
+                if max_val <= 10: dynamic_dtick = 2
+                elif max_val <= 20: dynamic_dtick = 5
+                elif max_val <= 30: dynamic_dtick = 10
+                else: dynamic_dtick = 20
                 
-                # Y축 범위도 글자가 안 잘리게 최대값보다 25% 정도 더 높게 설정
                 y_range = [0, max_val * 1.25]
             else:
+                month_font_size = 14
                 dynamic_dtick = 1
                 y_range = [0, 10]
 
-            fig_month = px.line(monthly_display, x='연월_표시', y='quantity', 
+            # x축을 새로 만든 'short_date'로 설정
+            fig_month = px.line(monthly_display, x='short_date', y='quantity', 
                                 markers=True, text='quantity', height=320)
             
             fig_month.update_traces(
@@ -355,7 +367,7 @@ with col_b:
                 line_width=3,
                 marker=dict(size=12, symbol="circle", color="#2E7D32", line=dict(width=2, color="white")), 
                 textposition="top center", 
-                cliponaxis=False, # 글자 잘림 방지
+                cliponaxis=False,
                 textfont=dict(size=15, family="Arial Black", color="black")
             )
             
@@ -365,7 +377,7 @@ with col_b:
                 xaxis={
                     'type': 'category', 
                     'fixedrange': True,
-                    'tickfont': {'size': 14, 'family': "Arial Black"},
+                    'tickfont': {'size': month_font_size, 'family': "Arial Black"}, # 동적 폰트 적용
                     'showgrid': False,
                     'showline': True,
                     'linewidth': 2,
@@ -375,7 +387,7 @@ with col_b:
                 yaxis={
                     'fixedrange': True, 
                     'showgrid': True,
-                    'dtick': dynamic_dtick,   # 계산된 동적 간격 적용
+                    'dtick': dynamic_dtick,
                     'gridcolor': '#DCDCDC',
                     'gridwidth': 1,
                     'griddash': 'dot',
@@ -385,24 +397,20 @@ with col_b:
                     'linewidth': 2,
                     'linecolor': '#A5D6A7',
                     'mirror': True,
-                    'range': y_range,          # 동적 범위 적용
-                    'title': None      # 내부 title 속성도 확실히 제거
+                    'range': y_range,
+                    'title': None
                 },
-                margin=dict(l=5, r=10, t=60, b=10), # 상단 여백 넉넉히 유지
+                margin=dict(l=5, r=10, t=60, b=10),
                 paper_bgcolor='rgba(0,0,0,0)', 
                 plot_bgcolor='rgba(255,255,255,0.5)',
                 dragmode=False,
                 hovermode='x unified'
             )
             
-            # 2. 월간 추이 차트 부분도 동일하게 적용
             st.plotly_chart(
                 fig_month, 
-                width='stretch',  # 최신 가이드라인 반영
-                config={
-                    'displayModeBar': False, 
-                    'scrollZoom': False
-                }
+                width='stretch', 
+                config={'displayModeBar': False, 'scrollZoom': False}
             )
 
 with tab2:
