@@ -278,29 +278,41 @@ with col_b:
             )
             
             fig_day.update_layout(
-                xaxis_title=None, 
-                yaxis_title=None,
-                xaxis={
-                    'type': 'category', 
-                    'fixedrange': True,
-                    'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}
-                },
-                yaxis={
-                    'fixedrange': True, 
-                    'dtick': day_dtick,       # 계산된 동적 눈금 적용
-                    'range': day_y_range,     # 동적 범위 적용
-                    'gridcolor': '#DCDCDC',
-                    'showgrid': True,
-                    'title': None      # 내부 title 속성도 확실히 제거
-                },
-                bargap=dynamic_bargap,
-                margin=dict(l=10, r=10, t=40, b=10),
-                paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
-                dragmode=False,
-                hovermode='x unified',
-                showlegend=True,
-                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1, title=None)
-            )
+                    xaxis_title=None, 
+                    yaxis_title=None,
+                    xaxis={
+                        'type': 'category', 
+                        'fixedrange': True,
+                        'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}
+                    },
+                    yaxis={
+                        'fixedrange': True, 
+                        'dtick': day_dtick,
+                        'range': day_y_range,
+                        'gridcolor': '#DCDCDC',
+                        'showgrid': True,
+                        'title': None
+                    },
+                    bargap=dynamic_bargap,
+                    margin=dict(l=5, r=10, t=40, b=10), # 왼쪽 여백 축소로 공간 확보
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    dragmode=False,
+                    hovermode='x unified',
+                    showlegend=True,
+                    # --- 범례(Legend) 설정 수정 ---
+                    legend=dict(
+                        orientation="h",      # 가로 나열
+                        yanchor="bottom", 
+                        y=1.02,               # 차트 바로 위 배치
+                        xanchor="left",       # 왼쪽부터 채우기
+                        x=0,                  # 왼쪽 정렬
+                        title=None,
+                        font=dict(size=11),   # 글자 크기를 살짝 줄여 더 많이 들어가게 함
+                        entrywidthmode="fraction", # 너비를 비율로 설정
+                        entrywidth=0.2        # 0.2로 설정하면 한 줄에 최대 5개(1/5)까지 배치
+                    )
+                )
 
             st.plotly_chart(
                 fig_day, 
