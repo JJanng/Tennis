@@ -97,7 +97,7 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def load_all_data():
     """구글 시트의 usage 워크시트에서 데이터를 로드하고 전처리합니다."""
     try:
-        df = conn.read(worksheet="usage", ttl="0")
+        df = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], worksheet="usage")
         if df is not None and not df.empty:
             df['date'] = pd.to_datetime(df['date']).dt.normalize()
             df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
