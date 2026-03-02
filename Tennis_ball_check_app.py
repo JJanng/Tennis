@@ -1,27 +1,16 @@
 import streamlit as st
+import sqlite3
 import pandas as pd
 from datetime import date
 import os
 import plotly.express as px
-import gspread
-from google.oauth2.service_account import Credentials
 
-# =========================================================
-# [1] 페이지 설정 및 레이아웃 최적화
-# =========================================================
-st.set_page_config(
-    page_title="테니스 볼 사용량 관리자", 
-    page_icon="🎾",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# 페이지 설정
+st.set_page_config(page_title="테니스 볼 관리자", layout="wide")
 
-# =========================================================
-# [2] 테마 및 모바일 대응 맞춤형 CSS (원본 디테일 100%)
-# =========================================================
+# 테마 및 모바일 대응 CSS
 st.markdown("""
     <style>
-    /* 전체 배경색 및 컨테이너 여백 설정 */
     .block-container {
         padding-top: 3.5rem !important; 
         padding-bottom: 1rem !important;
@@ -30,7 +19,6 @@ st.markdown("""
     }
     .main { background-color: #F1F8E9; }
     
-    /* 메인 타이틀 스타일 */
     .main-title {
         font-size: 22px !important;
         color: #2E7D32;
@@ -43,238 +31,138 @@ st.markdown("""
         padding: 15px;
         border-radius: 15px;
         border: 2px solid #A5D6A7;
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
     }
     
-    /* 헤더 및 메트릭 텍스트 색상 */
     h1, h2, h3 { color: #2E7D32; margin-top: 10px; margin-bottom: 5px; }
-    [data-testid="stMetricValue"] { color: #EF6C00; font-weight: bold; }
+    [data-testid="stMetricValue"] { color: #EF6C00; }
     
-    /* 탭 메뉴 폰트 크기 조정 */
     .stTabs [data-baseweb="tab-list"] button [data-testid="stWidgetLabel"] p {
         font-size: 16px;
-        font-weight: 600;
     }
             
-    /* 입력 버튼 스타일링 (모바일 클릭 편의성) */
     .stButton>button { 
         background-color: #2E7D32; 
         color: white; 
         border-radius: 12px; 
         font-weight: bold; 
-        width: 100%; 
-        height: 3.5rem !important; 
-        font-size: 24px !important;
+        width: 120%; 
+        height: 3.0rem !important; 
+        font-size: 30px !important;
         display: flex;
         align-items: center;
         justify-content: center;
         margin-top: 10px;
-        border: none;
-        transition: all 0.3s ease;
     }
     
     .stButton>button:hover {
         background-color: #1B5E20;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        transform: translateY(-2px);
+        border: 2px solid #A5D6A7;
     }
 
-    /* --- [중요] 모바일 차트 스크롤 및 터치 레이어 해결 --- */
-    /* 1. Plotly iframe의 세로 스크롤(터치 액션) 허용 */
+    /* --- 모바일 차트 드래그 해결 핵심 CSS --- */
+    
+    /* 1. Plotly가 렌더링되는 iframe의 세로 스크롤 허용 */
     iframe[title="plotly.graph_objs._figure.Figure"] {
         touch-action: pan-y !important;
     }
 
-    /* 2. 차트 드래그 레이어 무력화: 모바일에서 차트 위를 밀어도 페이지 스크롤이 되도록 함 */
+    /* 2. 차트를 덮고 있는 투명 드래그 레이어 무력화 (가장 중요) */
+    /* pointer-events: none은 터치가 차트를 통과하여 배경(스크롤)에 전달되게 합니다. */
     .js-plotly-plot .plotly .draglayer,
     .js-plotly-plot .plotly .nsewdrag {
         pointer-events: none !important;
         touch-action: pan-y !important;
     }
 
-    /* 3. 툴팁 및 데이터 포인트 클릭 기능은 유지 */
+    /* 3. 데이터 포인트(바, 라인) 클릭 툴팁은 작동하도록 복구 */
     .js-plotly-plot .plotly .points,
     .js-plotly-plot .plotly .barlayer,
     .js-plotly-plot .plotly .lineLayer {
         pointer-events: all !important;
     }
     
-    /* 사이드바 스타일 커스텀 */
-    [data-testid="stSidebar"] {
-        background-color: #E8F5E9;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# =========================================================
-# [3] 구글 시트 엔진 및 데이터 핸들링 로직 (FIXED VERSION)
-# =========================================================
+DB_FILE = "ballusage.db"
 
-@st.cache_resource
 def get_connection():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    return sqlite3.connect(DB_FILE, check_same_thread=False)
 
-    # 👉 현재 실행 중인 파이썬 파일 위치 기준으로 JSON 경로 생성
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(BASE_DIR, "tennis-ball-app-a90a07576e7b.json")
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, member TEXT UNIQUE)")
+    cur.execute("CREATE TABLE IF NOT EXISTS usage (id INTEGER PRIMARY KEY AUTOINCREMENT, member TEXT NOT NULL, date TEXT NOT NULL, quantity INTEGER)")
+    conn.commit()
+    conn.close()
 
-    creds = Credentials.from_service_account_file(
-        json_path,
-        scopes=scope
-    )
-
-    client = gspread.authorize(creds)
-
-    spreadsheet = client.open_by_key("17aJtYUZVC8K-zan4q9LM-5vApbMZA2yZH-uVUB9978w")
-
-    return spreadsheet
-
-conn = get_connection()
-
-
-@st.cache_data(ttl=60)
 def load_all_data():
-    try:
-        sh = conn.worksheet("usage")
-        data = sh.get_all_records()
-        df = pd.DataFrame(data)
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM usage", conn)
+    conn.close()
+    if not df.empty:
+        df['date'] = pd.to_datetime(df['date']).dt.normalize()
+        df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
+        df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
+        df = df.sort_values(by='date')
+    return df
 
-        if not df.empty:
-            df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.normalize()
-            df = df.dropna(subset=['date'])
-
-            df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
-            df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
-
-            df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0).astype(int)
-
-        return df
-
-    except Exception as e:
-        st.error(f"데이터 로드 중 오류 발생: {e}")
-        return pd.DataFrame(columns=['member', 'date', 'quantity'])
-
-
-@st.cache_data(ttl=300)
 def load_members():
-    try:
-        sh = conn.worksheet("members")
-        data = sh.get_all_records()
-        df = pd.DataFrame(data)
+    conn = get_connection()
+    members = [m[0] for m in conn.execute("SELECT member FROM members ORDER BY member").fetchall()]
+    conn.close()
+    return members
 
-        if not df.empty:
-            return sorted(df['member'].dropna().unique().tolist())
-
-        return []
-
-    except Exception as e:
-        st.warning(f"회원 목록 로드 실패: {e}")
-        return []
-
-
-# 데이터 로드 실행
+# DB 초기화 및 데이터 로드 (핵심: 코드 상단에서 먼저 정의)
+init_db()
 df_all = load_all_data()
 members_list = load_members()
 
-
-# 세션 상태 초기화
+# 세션 상태 초기화 (관리자 인증 유지용)
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
 
+st.markdown('<p class="main-title">🎾 테니스 볼 사용량 관리 APP</p>', unsafe_allow_html=True)
 
-# 앱 헤더 출력
-st.markdown('<p class="main-title">🎾 테니스 볼 사용량 관리 시스템</p>', unsafe_allow_html=True)
-
-# =========================================================
-# [4] 사이드바: 관리자 도구 및 마스터 데이터 관리
-# =========================================================
+# --- 사이드바: 관리자 인증 ---
 with st.sidebar:
-    st.header("⚙️ 시스템 설정")
-    is_admin = st.checkbox("관리자 권한 활성화", help="기록 삭제 및 회원 관리를 위해 체크하세요.")
-    
+    st.header("⚙️ 관리 도구")
+    is_admin = st.checkbox("관리자 모드 활성화")
     if is_admin:
-        admin_pwd = st.text_input("관리자 비밀번호", type="password")
+        admin_pwd = st.text_input("비밀번호", type="password")
         if admin_pwd == "2612":
             st.session_state['authenticated'] = True
-            st.success("🔓 관리자 인증 성공")
-            
-            # --- 회원 명단 관리 섹션 ---
-            with st.expander("👤 회원 명단 수정", expanded=False):
-                new_member_name = st.text_input("신규 등록 성함", placeholder="예: 홍길동")
-                if st.button("회원 추가하기", use_container_width=True):
-                    if new_member_name.strip():
-                        current_m = load_members()
-                        if new_member_name.strip() not in current_m:
-                            # 새 회원을 포함한 데이터프레임 구성
-                            updated_m_df = pd.DataFrame({"member": current_m + [new_member_name.strip()]})
-                            # [PATCH] 마스터 테이블은 반드시 update(덮어쓰기) 수행
-                            spreadsheet = get_connection()
-                            members_ws = spreadsheet.worksheet("members")
-
-                            members_ws.clear()
-
-                            members_ws.update(
-                                [updated_m_df.columns.values.tolist()] +
-                                updated_m_df.values.tolist()
-                            )
-
-                            st.cache_data.clear() # 캐시 강제 무효화
-                            st.success(f"{new_member_name}님 등록 완료!")
+            st.success("인증되었습니다.")
+            with st.expander("👤 회원 명단 관리"):
+                new_member = st.text_input("새 회원 이름")
+                if st.button("회원 추가"):
+                    if new_member.strip():
+                        conn = get_connection()
+                        try:
+                            conn.execute("INSERT INTO members (member) VALUES (?)", (new_member.strip(),))
+                            conn.commit()
                             st.rerun()
-                        else:
-                            st.error("이미 등록된 이름입니다.")
+                        except: st.error("이미 존재합니다.")
+                        finally: conn.close()
                 
-                st.divider()
-                
-                # 회원 삭제 로직
-                members_for_del = load_members()
-                selected_del_mem = st.selectbox("영구 삭제할 이름", ["선택"] + members_for_del)
-                if st.button("회원 정보 삭제", type="secondary", use_container_width=True):
-                    if selected_del_mem != "선택":
-                        # 1. 명단에서 제거
-                        updated_m_df = pd.DataFrame({"member": [m for m in members_for_del if m != selected_del_mem]})
-                        spreadsheet = get_connection()
-                        members_ws = spreadsheet.worksheet("members")
-
-                        members_ws.clear()
-
-                        members_ws.update(
-                            [updated_m_df.columns.values.tolist()] +
-                            updated_m_df.values.tolist()
-                        )
-
-                        # 2. [중요] 사용 기록 시트에서도 해당 데이터 제거
-                        spreadsheet = get_connection()
-                        usage_ws = spreadsheet.worksheet("usage")
-
-                        data = usage_ws.get_all_records()
-                        df_usage = pd.DataFrame(data)
-
-                        filtered_usage = df_usage[df_usage['member'] != selected_del_mem]
-
-                        usage_ws.clear()
-                        usage_ws.update(
-                            [filtered_usage.columns.values.tolist()] +
-                            filtered_usage.values.tolist()
-                        )
-                      
-                        st.cache_data.clear()
-                        st.warning(f"{selected_del_mem}님 관련 모든 정보 파기 완료")
-                        st.rerun()
+                members = load_members()
+                del_mem = st.selectbox("삭제할 회원", ["선택"] + members)
+                if st.button("회원 삭제") and del_mem != "선택":
+                    conn = get_connection()
+                    conn.execute("DELETE FROM usage WHERE member=?", (del_mem,))
+                    conn.execute("DELETE FROM members WHERE member=?", (del_mem,))
+                    conn.commit()
+                    conn.close()
+                    st.rerun()
         else:
             st.session_state['authenticated'] = False
-            if admin_pwd:
-                st.error("🔑 비밀번호가 일치하지 않습니다.")
+            if admin_pwd: st.error("비밀번호가 틀렸습니다.")
     else:
         st.session_state['authenticated'] = False
 
-# =========================================================
-# [5] 데이터 입력 인터페이스 (메인 화면 상단)
-# =========================================================
-st.subheader("📝 사용량 기록하기")
+# --- 데이터 입력 섹션 ---
 with st.container():
     input_mode = st.radio("입력 방식 선택", ["기존 회원 선택", "신규/직접 입력"], horizontal=True)
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -307,16 +195,11 @@ with st.container():
             st.error("⚠️ 수량은 정수(0, 1, 2...)로만 입력해 주세요!")
         elif target_member and str(target_member).strip():
             save_name = str(target_member).strip()
-            spreadsheet = get_connection()
-            usage_ws = spreadsheet.worksheet("usage")
-
-            usage_ws.append_row([
-                save_name,
-                str(target_date),
-                int(target_qty)
-            ])
-
-            st.cache_data.clear()
+            conn = get_connection()
+            conn.execute("INSERT INTO usage (member, date, quantity) VALUES (?, ?, ?)", 
+                         (save_name, str(target_date), int(target_qty)))
+            conn.commit()
+            conn.close()
             st.success(f"✅ {save_name}님 저장 완료!")
             st.rerun()
         else:
@@ -531,50 +414,32 @@ with col_b:
             )
 
 with tab2:
-    if st.session_state.get('authenticated', False):
+    if st.session_state['authenticated']:
         st.subheader("📝 기록 수정 및 삭제")
-        
         if not df_all.empty:
-            # 원본 복사 및 정렬
             df_edit = df_all.copy()
-            df_edit['date'] = df_edit['date'].dt.date  # datetime → date
+            df_edit['date'] = df_edit['date'].dt.date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
-
-            st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 '💾 변경사항 최종 저장' 버튼을 누르세요.")
             
-            # 데이터 에디터
-            edited_df = st.data_editor(
-                df_edit[['member', 'date', 'quantity']],
-                num_rows="dynamic",
-                key="data_editor",
-                hide_index=True
-            )
+            st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 저장 버튼을 누르세요.")
+            edited_df = st.data_editor(df_edit[['member', 'date', 'quantity']], num_rows="dynamic", key="data_editor", hide_index=True)
 
-            # 저장 버튼
             if st.button("💾 변경사항 최종 저장"):
-                # 필수 컬럼 체크 및 결측값 제거
                 final_df = edited_df.dropna(subset=['member', 'date'])
-                
-                if final_df.empty:
-                    st.warning("⚠️ 저장할 데이터가 없습니다. 모든 행이 제거되었거나 필수 항목이 누락되었습니다.")
-                else:
-                    conn = get_connection()
-                    try:
-                        # 기존 데이터 삭제
-                        conn.execute("DELETE FROM usage")
-
-                        # 저장용 데이터 처리
-                        save_df = final_df[['member', 'date', 'quantity']].copy()
-                        save_df['date'] = save_df['date'].astype(str)  # DB 저장용 문자열 변환
+                conn = get_connection()
+                try:
+                    conn.execute("DELETE FROM usage")
+                    if not final_df.empty:
+                        save_df = final_df[['member', 'date', 'quantity']]
+                        save_df['date'] = save_df['date'].astype(str)
                         save_df.to_sql("usage", conn, if_exists="append", index=False)
-
-                        conn.commit()
-                        st.success("✅ 데이터베이스 업데이트 완료!")
-                        st.experimental_rerun()  # 변경사항 반영 위해 페이지 새로고침
-                    except Exception as e:
-                        st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
-                    finally:
-                        conn.close()
+                    conn.commit()
+                    st.success("데이터베이스 업데이트 완료!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"오류가 발생했습니다: {e}")
+                finally:
+                    conn.close()
         else:
             st.info("수정할 기록이 없습니다.")
     else:
