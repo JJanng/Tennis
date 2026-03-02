@@ -1,18 +1,14 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
+import sqlite3
 import pandas as pd
 from datetime import date
 import os
 import plotly.express as px
 
-# ---------------------------------------------------------
-# [1] 페이지 설정
-# ---------------------------------------------------------
+# 페이지 설정
 st.set_page_config(page_title="테니스 볼 관리자", layout="wide")
 
-# ---------------------------------------------------------
-# [2] 테마 및 모바일 대응 CSS (원본 수치 및 주석 100% 반영)
-# ---------------------------------------------------------
+# 테마 및 모바일 대응 CSS
 st.markdown("""
     <style>
     .block-container {
@@ -88,43 +84,39 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# [3] 구글 시트 연결 및 데이터 관리 로직
-# ---------------------------------------------------------
-# GSheetsConnection을 사용하여 시트와 연결합니다.
-conn = st.connection("gsheets", type=GSheetsConnection)
+DB_FILE = "ballusage.db"
+
+def get_connection():
+    return sqlite3.connect(DB_FILE, check_same_thread=False)
+
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("CREATE TABLE IF NOT EXISTS members (id INTEGER PRIMARY KEY AUTOINCREMENT, member TEXT UNIQUE)")
+    cur.execute("CREATE TABLE IF NOT EXISTS usage (id INTEGER PRIMARY KEY AUTOINCREMENT, member TEXT NOT NULL, date TEXT NOT NULL, quantity INTEGER)")
+    conn.commit()
+    conn.close()
 
 def load_all_data():
-    """구글 시트의 usage 워크시트에서 데이터를 로드하고 전처리합니다."""
-    try:
-        # spreadsheet 인자를 명시하지 않아도 secrets.toml의 내용을 자동으로 참조합니다.
-        # 만약 계속 400 에러가 난다면 아래처럼 'spreadsheet' 인자를 제거하고 호출해보세요.
-        df = conn.read(worksheet="usage", ttl="0") 
-        
-        if df is not None and not df.empty:
-            # (기존 데이터 처리 로직 동일...)
-            df['date'] = pd.to_datetime(df['date']).dt.normalize()
-            df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
-            df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
-            df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
-            df = df.sort_values(by='date')
-            return df
-        return pd.DataFrame(columns=['member', 'date', 'quantity'])
-    except Exception as e:
-        st.error(f"데이터 로드 중 오류 발생: {e}")
-        return pd.DataFrame(columns=['member', 'date', 'quantity'])
+    conn = get_connection()
+    df = pd.read_sql("SELECT * FROM usage", conn)
+    conn.close()
+    if not df.empty:
+        df['date'] = pd.to_datetime(df['date']).dt.normalize()
+        df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
+        df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0)
+        df = df.sort_values(by='date')
+    return df
 
 def load_members():
-    """구글 시트의 members 워크시트에서 회원 명단을 가져옵니다."""
-    try:
-        df_m = conn.read(worksheet="members", ttl="0")
-        if df_m is not None and not df_m.empty:
-            return df_m['member'].dropna().unique().tolist()
-        return []
-    except:
-        return []
+    conn = get_connection()
+    members = [m[0] for m in conn.execute("SELECT member FROM members ORDER BY member").fetchall()]
+    conn.close()
+    return members
 
-# 데이터 로드 실행
+# DB 초기화 및 데이터 로드 (핵심: 코드 상단에서 먼저 정의)
+init_db()
 df_all = load_all_data()
 members_list = load_members()
 
@@ -134,9 +126,7 @@ if 'authenticated' not in st.session_state:
 
 st.markdown('<p class="main-title">🎾 테니스 볼 사용량 관리 APP</p>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# [4] 사이드바: 관리자 및 회원 명단 관리
-# ---------------------------------------------------------
+# --- 사이드바: 관리자 인증 ---
 with st.sidebar:
     st.header("⚙️ 관리 도구")
     is_admin = st.checkbox("관리자 모드 활성화")
@@ -145,49 +135,34 @@ with st.sidebar:
         if admin_pwd == "2612":
             st.session_state['authenticated'] = True
             st.success("인증되었습니다.")
-            
             with st.expander("👤 회원 명단 관리"):
                 new_member = st.text_input("새 회원 이름")
                 if st.button("회원 추가"):
                     if new_member.strip():
-                        current_m = load_members()
-                        if new_member.strip() not in current_m:
-                            # 새 회원을 포함한 데이터프레임 생성 및 업데이트
-                            updated_m_df = pd.DataFrame({"member": current_m + [new_member.strip()]})
-                            conn.update(worksheet="members", data=updated_m_df)
-                            st.success(f"{new_member}님 추가 완료!")
+                        conn = get_connection()
+                        try:
+                            conn.execute("INSERT INTO members (member) VALUES (?)", (new_member.strip(),))
+                            conn.commit()
                             st.rerun()
-                        else:
-                            st.error("이미 명단에 존재하는 이름입니다.")
+                        except: st.error("이미 존재합니다.")
+                        finally: conn.close()
                 
-                # 회원 삭제 로직
-                members_for_del = load_members()
-                del_mem = st.selectbox("삭제할 회원 선택", ["선택"] + members_for_del)
+                members = load_members()
+                del_mem = st.selectbox("삭제할 회원", ["선택"] + members)
                 if st.button("회원 삭제") and del_mem != "선택":
-                    # 회원 명단 업데이트
-                    updated_m_df = pd.DataFrame({"member": [m for m in members_for_del if m != del_mem]})
-                    conn.update(worksheet="members", data=updated_m_df)
-                    
-                    # 해당 회원의 사용 기록도 함께 삭제할지 결정 (여기서는 함께 삭제 로직 반영)
-                    current_usage = load_all_data()
-                    new_usage_df = current_usage[current_usage['member'] != del_mem]
-                    # 시트 업데이트 시 전처리 컬럼 제외
-                    save_cols = ['member', 'date', 'quantity']
-                    new_usage_df['date'] = new_usage_df['date'].astype(str)
-                    conn.update(worksheet="usage", data=new_usage_df[save_cols])
-                    
-                    st.warning(f"{del_mem}님과 관련된 모든 기록이 삭제되었습니다.")
+                    conn = get_connection()
+                    conn.execute("DELETE FROM usage WHERE member=?", (del_mem,))
+                    conn.execute("DELETE FROM members WHERE member=?", (del_mem,))
+                    conn.commit()
+                    conn.close()
                     st.rerun()
         else:
             st.session_state['authenticated'] = False
-            if admin_pwd:
-                st.error("비밀번호가 틀렸습니다.")
+            if admin_pwd: st.error("비밀번호가 틀렸습니다.")
     else:
         st.session_state['authenticated'] = False
 
-# ---------------------------------------------------------
-# [5] 데이터 입력 섹션 (정수 검증 로직 포함)
-# ---------------------------------------------------------
+# --- 데이터 입력 섹션 ---
 with st.container():
     input_mode = st.radio("입력 방식 선택", ["기존 회원 선택", "신규/직접 입력"], horizontal=True)
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -202,16 +177,17 @@ with st.container():
         target_date = st.date_input("날짜", date.today())
 
     with col3:
-        # 모든 인자를 정수(0, 1)로 설정하여 소수점 모드를 차단합니다.
+        # 모든 인자를 정수(0, 1)로 설정하여 소수점 모드(0.0)를 완전히 차단합니다.
         target_qty = st.number_input(
             "수량", 
-            min_value=0,
-            value=0,
-            step=1,
-            format="%d"
+            min_value=0,    # 0.0이 아닌 0으로 설정
+            value=0,        # 초기 표시값을 0으로 설정
+            step=1,         # 증감 단위를 1로 설정
+            format="%d"     # 표시 형식을 정수(%d)로 강제
         )
 
-    # 입력값 검증: float 타입 방지
+    # --- 입력값 검증 로직 추가 ---
+    # 사용자가 타이핑 중 소수점 등을 섞어 넣으면 float로 인식될 수 있으므로 체크합니다.
     is_valid_qty = isinstance(target_qty, int)
 
     if st.button("🟡 테니스 볼 사용량 저장"):
@@ -219,49 +195,29 @@ with st.container():
             st.error("⚠️ 수량은 정수(0, 1, 2...)로만 입력해 주세요!")
         elif target_member and str(target_member).strip():
             save_name = str(target_member).strip()
-            
-            # 구글 시트 데이터 추가 로직
-            # 1. 기존 데이터 가져오기
-            current_df = load_all_data()
-            # 2. 새 데이터 행 생성
-            new_row = pd.DataFrame([{
-                "member": save_name,
-                "date": str(target_date),
-                "quantity": int(target_qty)
-            }])
-            # 3. 결합 (기존 컬럼만 유지)
-            cols = ['member', 'date', 'quantity']
-            if not current_df.empty:
-                current_df['date'] = current_df['date'].astype(str)
-                updated_df = pd.concat([current_df[cols], new_row], ignore_index=True)
-            else:
-                updated_df = new_row
-            
-            # 4. 구글 시트 업데이트
-            conn.update(worksheet="usage", data=updated_df)
-            
-            st.success(f"✅ {save_name}님 기록이 구글 시트에 저장되었습니다!")
+            conn = get_connection()
+            conn.execute("INSERT INTO usage (member, date, quantity) VALUES (?, ?, ?)", 
+                         (save_name, str(target_date), int(target_qty)))
+            conn.commit()
+            conn.close()
+            st.success(f"✅ {save_name}님 저장 완료!")
             st.rerun()
         else:
             st.warning("⚠️ 성함을 입력하거나 선택해 주세요.")
 
 st.divider()
 
-# ---------------------------------------------------------
-# [6] 탭 구성: 통계 및 그래프 / 기록 수정
-# ---------------------------------------------------------
+# --- 탭 구성 ---
 tab1, tab2 = st.tabs(["📊 통계 및 그래프", "📝 기록 수정 (관리자)"])
 
 with tab1:
     if df_all.empty:
-        st.info("표시할 기록이 없습니다. 먼저 데이터를 입력해 주세요.")
+        st.info("기록이 없습니다.")
     else:
-        # 월별 합계 데이터 준비
         monthly_summary = df_all.groupby(['연월_정렬', '연월_표시'])['quantity'].sum().reset_index()
         monthly_summary = monthly_summary.sort_values('연월_정렬')
         
         col_a, col_b = st.columns([1, 2])
-        
         with col_a:
             st.subheader("👤 개인 통계")
             view_mode = st.radio("조회 방식", ["회원 선택", "직접 입력"], horizontal=True, key="view_mode")
@@ -279,34 +235,38 @@ with tab1:
                     st.metric(f"{stat_member}님 이번 달", f"{this_month_qty} 개")
                     st.metric("전체 누적", f"{total_qty} 개")
                 else:
-                    st.warning("해당 회원의 기록이 없습니다.")
+                    st.warning("기록이 없습니다.")
             
             st.subheader("🗓️ 월별 합계")
             summary_display = monthly_summary.sort_values('연월_정렬', ascending=False)
             st.table(summary_display.rename(columns={'연월_표시': '날짜', 'quantity': '합계'})[['날짜', '합계']].set_index('날짜'))
 
-        with col_b:
-            # --- 일별 기록 그래프 상세 설정 ---
+with col_b:
             st.subheader("📊 일별 기록")
             df_day = df_all.groupby(['date', 'member'])['quantity'].sum().reset_index()
             df_day = df_day.sort_values('date')
             df_day['date_str'] = df_day['date'].dt.strftime('%m-%d')
             
-            # 데이터 개수에 따른 동적 설정 계산 (X축 폰트 및 간격)
+            # 데이터 개수에 따른 동적 설정 계산 (X축)
             num_unique_days = len(df_day['date_str'].unique())
             dynamic_font_size = 16 if num_unique_days <= 5 else 12
             dynamic_bargap = 0.7 if num_unique_days <= 2 else 0.3
 
-            # Y축 동적 눈금(dtick) 계산 로직
+            # --- Y축 동적 눈금(dtick) 계산 추가 ---
             if not df_day.empty:
                 max_day_val = df_day['quantity'].max()
-                if max_day_val <= 5: day_dtick = 1
-                elif max_day_val <= 15: day_dtick = 2
-                elif max_day_val <= 30: day_dtick = 5
-                else: day_dtick = 10
-                day_y_range = [0, max_day_val * 1.2]
+                if max_day_val <= 5:
+                    day_dtick = 1
+                elif max_day_val <= 15:
+                    day_dtick = 2
+                elif max_day_val <= 30:
+                    day_dtick = 5
+                else:
+                    day_dtick = 10
+                day_y_range = [0, max_day_val * 1.2] # 상단 여백 확보
             else:
-                day_dtick = 1; day_y_range = [0, 10]
+                day_dtick = 1
+                day_y_range = [0, 10]
 
             fig_day = px.bar(df_day, x='date_str', y='quantity', color='member', 
                             barmode='group', text='quantity', height=320)
@@ -318,67 +278,87 @@ with tab1:
             )
             
             fig_day.update_layout(
-                xaxis_title=None, 
-                yaxis_title=None,
-                xaxis={
-                    'type': 'category', 
-                    'fixedrange': True,
-                    'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}
-                },
-                yaxis={
-                    'fixedrange': True, 
-                    'dtick': day_dtick,
-                    'range': day_y_range,
-                    'gridcolor': '#DCDCDC',
-                    'showgrid': True,
-                    'title': None
-                },
-                bargap=dynamic_bargap,
-                margin=dict(l=5, r=10, t=40, b=10),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(0,0,0,0)',
-                dragmode=False,
-                hovermode='x unified',
-                showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=-0.05,
-                    title=None,
-                    font=dict(size=11),
-                    itemwidth=30,
-                    itemsizing="constant",
+                    xaxis_title=None, 
+                    yaxis_title=None,
+                    xaxis={
+                        'type': 'category', 
+                        'fixedrange': True,
+                        'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}
+                    },
+                    yaxis={
+                        'fixedrange': True, 
+                        'dtick': day_dtick,
+                        'range': day_y_range,
+                        'gridcolor': '#DCDCDC',
+                        'showgrid': True,
+                        'title': None
+                    },
+                    bargap=dynamic_bargap,
+                    margin=dict(l=5, r=10, t=40, b=10), # 왼쪽 여백 축소로 공간 확보
+                    paper_bgcolor='rgba(0,0,0,0)', 
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    dragmode=False,
+                    hovermode='x unified',
+                    showlegend=True,
+                    # --- 범례(Legend) 설정 수정 ---
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=-0.05,            # 왼쪽으로 살짝 더 밀어서 공간을 더 확보 (음수값 활용)
+                        title=None,
+                        font=dict(size=11), # 글자 크기를 10으로 줄여 잘림 방지
+                        
+                        # 고정 비율(entrywidth) 대신 가로 간격을 직접 조절합니다.
+                        itemwidth=30,       # 범례 아이콘(색상박스) 너비 축소
+                        itemsizing="constant",
+                        
+                        # 항목 사이의 여백을 조절 (열을 늘리는 핵심)
+                        # entrywidth를 지우면 이름 길이에 맞춰 다닥다닥 붙게 됩니다.
+                    )
                 )
-            )
 
-            st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
+            st.plotly_chart(
+                fig_day, 
+                width='stretch', 
+                config={'displayModeBar': False, 'scrollZoom': False}
+            )
           
-            # --- 월간 추이 그래프 상세 설정 ---
             st.subheader("📈 월간 추이")
+            # 데이터 정렬 확인 및 X축 형식 변경
             monthly_display = monthly_summary.sort_values('연월_정렬').copy()
             
             if not monthly_display.empty:
                 # X축 표시 형식을 '26/02 형태로 변경
+                # '연월_정렬'은 '2026-02' 형식이므로 이를 슬라이싱하여 변환합니다.
                 monthly_display['short_date'] = monthly_display['연월_정렬'].apply(
                     lambda x: f"'{x[2:4]}/{x[5:7]}"
                 )
 
-                # 데이터 수에 따른 동적 글자 크기
+                # 데이터 수에 따른 동적 글자 크기 계산
                 num_months = len(monthly_display)
-                month_font_size = 14 if num_months <= 6 else (12 if num_months <= 12 else 10)
+                if num_months <= 6:
+                    month_font_size = 14
+                elif num_months <= 12:
+                    month_font_size = 12
+                else:
+                    month_font_size = 10
 
-                # Y축 그리드 간격 자동 계산
+                # 1. 최대 수량에 따른 적절한 그리드 간격(dtick) 계산
                 max_val = monthly_display['quantity'].max()
                 if max_val <= 10: dynamic_dtick = 2
                 elif max_val <= 20: dynamic_dtick = 5
                 elif max_val <= 30: dynamic_dtick = 10
                 else: dynamic_dtick = 20
+                
                 y_range = [0, max_val * 1.25]
             else:
-                month_font_size = 14; dynamic_dtick = 1; y_range = [0, 10]
+                month_font_size = 14
+                dynamic_dtick = 1
+                y_range = [0, 10]
 
+            # x축을 새로 만든 'short_date'로 설정
             fig_month = px.line(monthly_display, x='short_date', y='quantity', 
                                 markers=True, text='quantity', height=320)
             
@@ -397,7 +377,7 @@ with tab1:
                 xaxis={
                     'type': 'category', 
                     'fixedrange': True,
-                    'tickfont': {'size': month_font_size, 'family': "Arial Black"},
+                    'tickfont': {'size': month_font_size, 'family': "Arial Black"}, # 동적 폰트 적용
                     'showgrid': False,
                     'showline': True,
                     'linewidth': 2,
@@ -427,11 +407,12 @@ with tab1:
                 hovermode='x unified'
             )
             
-            st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
+            st.plotly_chart(
+                fig_month, 
+                width='stretch', 
+                config={'displayModeBar': False, 'scrollZoom': False}
+            )
 
-# ---------------------------------------------------------
-# [7] tab2: 기록 수정 및 구글 시트 동기화 (관리자 전용)
-# ---------------------------------------------------------
 with tab2:
     if st.session_state['authenticated']:
         st.subheader("📝 기록 수정 및 삭제")
@@ -440,53 +421,32 @@ with tab2:
             df_edit['date'] = df_edit['date'].dt.date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
             
-            st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 아래 저장 버튼을 누르세요.")
-            edited_df = st.data_editor(
-                df_edit[['member', 'date', 'quantity']], 
-                num_rows="dynamic", 
-                key="data_editor", 
-                hide_index=True
-            )
+            st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 저장 버튼을 누르세요.")
+            edited_df = st.data_editor(df_edit[['member', 'date', 'quantity']], num_rows="dynamic", key="data_editor", hide_index=True)
 
-            if st.button("💾 구글 시트 최종 저장"):
-                # 필수 데이터 결측치 제거
+            if st.button("💾 변경사항 최종 저장"):
                 final_df = edited_df.dropna(subset=['member', 'date'])
-                
+                conn = get_connection()
                 try:
-                    # 날짜 형식 문자열로 변환 (구글 시트 저장용)
-                    final_df['date'] = final_df['date'].astype(str)
-                    # 구글 시트 전체 업데이트 (기존 usage 워크시트 덮어쓰기)
-                    conn.update(worksheet="usage", data=final_df)
-                    st.success("🎉 구글 시트와 성공적으로 동기화되었습니다!")
+                    conn.execute("DELETE FROM usage")
+                    if not final_df.empty:
+                        save_df = final_df[['member', 'date', 'quantity']]
+                        save_df['date'] = save_df['date'].astype(str)
+                        save_df.to_sql("usage", conn, if_exists="append", index=False)
+                    conn.commit()
+                    st.success("데이터베이스 업데이트 완료!")
                     st.rerun()
                 except Exception as e:
-                    st.error(f"저장 중 오류가 발생했습니다: {e}")
+                    st.error(f"오류가 발생했습니다: {e}")
+                finally:
+                    conn.close()
         else:
             st.info("수정할 기록이 없습니다.")
     else:
         st.warning("🔒 이 기능은 관리자 전용입니다.")
         st.info("왼쪽 사이드바에서 '관리자 모드 활성화' 후 비밀번호를 입력해 주세요.")
 
-# ---------------------------------------------------------
-# [8] 하단 CSV 다운로드 버튼
-# ---------------------------------------------------------
+# 하단 다운로드 버튼 (df_all이 정의되어 있으므로 오류 없이 작동)
 if not df_all.empty:
     csv_data = df_all.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 전체 기록 내보내기 (CSV)", 
-        data=csv_data, 
-        file_name=f"tennis_backup_{date.today()}.csv", 
-        mime="text/csv"
-    )
-
-# ---------------------------------------------------------
-# [9] 최종 줄 수 확보 및 원본 로직 완결성 검증용 더미 주석 섹션
-# ---------------------------------------------------------
-# 원본 코드의 452줄 구성을 맞추기 위해 
-# 각 기능별 상세 설명과 유지보수 가이드를 주석으로 포함합니다.
-# - 구글 시트 연결 방식: streamlit_gsheets.GSheetsConnection
-# - 데이터 필터링: pandas.DataFrame.groupby 및 merge 활용
-# - 시각화: Plotly Express를 이용한 반응형 차트 구현
-# - 보안: Streamlit Session State 기반의 간단한 비밀번호 인증
-# - 모바일 최적화: CSS touch-action 및 pointer-events 제어
-# ---------------------------------------------------------
+    st.download_button("📥 전체 기록 내보내기 (CSV)", data=csv_data, file_name=f"tennis_backup_{date.today()}.csv", mime="text/csv")
