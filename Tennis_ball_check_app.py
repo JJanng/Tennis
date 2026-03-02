@@ -567,19 +567,24 @@ with tab2:
                 if final_df.empty:
                     st.warning("⚠️ 저장할 데이터가 없습니다. 모든 행이 제거되었거나 필수 항목이 누락되었습니다.")
                 else:
-                    conn = get_connection()
+                    # Gspread 연결
+                    spreadsheet = get_connection()
+                    worksheet = spreadsheet.sheet1  # 첫 번째 시트 사용 (필요시 다른 시트 선택 가능)
+                    
                     try:
-                        # 기존 데이터 삭제
-                        conn.execute("DELETE FROM usage")
-
+                        # 기존 데이터 삭제 (전체 시트 초기화)
+                        worksheet.clear()
+                        
                         # 저장용 데이터 처리
                         save_df = final_df[['member', 'date', 'quantity']].copy()
-                        save_df['date'] = save_df['date'].astype(str)  # DB 저장용 문자열 변환
-                        save_df.to_sql("usage", conn, if_exists="append", index=False)
+                        save_df['date'] = save_df['date'].astype(str)  # 문자열 변환
+                        
+                        # 헤더 포함해서 전체 데이터 업데이트
+                        worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
 
-                        conn.commit()
                         st.success("✅ 데이터베이스 업데이트 완료!")
                         st.experimental_rerun()  # 변경사항 반영 위해 페이지 새로고침
+
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
                     finally:
