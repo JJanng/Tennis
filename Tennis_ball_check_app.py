@@ -563,7 +563,7 @@ with tab2:
                 final_df = edited_df.dropna(subset=['member', 'date'])
 
                 if final_df.empty:
-                    st.warning("⚠️ 저장할 데이터가 없습니다. 모든 행이 제거되었거나 필수 항목이 누락되었습니다.")
+                    st.warning("⚠️ 저장할 데이터가 없습니다.")
                 else:
                     try:
                         # Gspread 연결
@@ -583,16 +583,13 @@ with tab2:
                         # 캐시 무효화
                         st.cache_data.clear()
 
-                        # 🔹 즉시 최신 데이터 다시 로드
+                        # 🔹 최신 데이터 재로드
                         df_all_new = load_all_data()
 
-                        # 화면에 새로운 데이터 반영
+                        # 🔹 기존 전역 df_all 덮어쓰기
+                        df_all = df_all_new.copy()
+
                         st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
-                        
-                        # 기존 df_all을 새 데이터로 덮어쓰기
-                        df_all.clear()  # 리스트/딕셔너리일 경우
-                        for col in df_all_new.columns:
-                            df_all[col] = df_all_new[col]
 
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
