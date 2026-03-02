@@ -125,21 +125,22 @@ def get_connection():
         "https://www.googleapis.com/auth/drive"
     ]
 
-    # 👉 현재 실행 중인 파이썬 파일 위치 기준으로 JSON 경로 생성
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    json_path = os.path.join(BASE_DIR, "tennis-ball-app-a90a07576e7b.json")
+    # 🔹 Secrets에서 GCP JSON 문자열 읽기
+    sa_json_str = st.secrets["GCP"]["service_account"].strip()
+    sa_info = json.loads(sa_json_str)
 
-    creds = Credentials.from_service_account_file(
-        json_path,
-        scopes=scope
-    )
+    # 🔹 파일 없이 credentials 생성
+    creds = service_account.Credentials.from_service_account_info(sa_info, scopes=scope)
 
+    # 🔹 Gspread 클라이언트 생성
     client = gspread.authorize(creds)
 
+    # 🔹 스프레드시트 열기
     spreadsheet = client.open_by_key("17aJtYUZVC8K-zan4q9LM-5vApbMZA2yZH-uVUB9978w")
 
     return spreadsheet
 
+# 🔹 사용
 conn = get_connection()
 
 
