@@ -143,25 +143,25 @@ def get_connection():
 # 🔹 사용
 conn = get_connection()
 
-
+# [3] 구글 시트 엔진 부분 수정
 @st.cache_data(ttl=60)
 def load_all_data():
     try:
+        # conn은 get_connection()의 결과물
         sh = conn.worksheet("usage")
         data = sh.get_all_records()
         df = pd.DataFrame(data)
 
         if not df.empty:
+            # 날짜 변환 및 정렬 처리
             df['date'] = pd.to_datetime(df['date'], errors='coerce').dt.normalize()
             df = df.dropna(subset=['date'])
-
             df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
             df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
-
             df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce').fillna(0).astype(int)
-
+            # 최신순 정렬 추가
+            df = df.sort_values('date', ascending=False)
         return df
-
     except Exception as e:
         st.error(f"데이터 로드 중 오류 발생: {e}")
         return pd.DataFrame(columns=['member', 'date', 'quantity'])
@@ -530,63 +530,55 @@ with col_b:
             )
 
 with tab2:
-    # 세션 상태 초기화 (KeyError 방지)
-    if 'df_all' not in st.session_state:
+    # 세션 상태에 데이터가 없으면 로드
+    if 'df_all' not in st.session_state or st.session_state['df_all'] is None:
         st.session_state['df_all'] = load_all_data()
 
     if st.session_state.get('authenticated', False):
         st.subheader("📝 기록 수정 및 삭제")
         
-        if not st.session_state['df_all'].empty:
-            # 원본 복사 및 정렬
-            df_edit = st.session_state['df_all'].copy()
-            df_edit['date'] = pd.to_datetime(df_edit['date']).dt.date  # datetime → date
-            df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
-
-            st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 '💾 변경사항 최종 저장' 버튼을 누르세요.")
+        df_edit_source = st.session_state['df_all']
+        
+        if not df_edit_source.empty:
+            df_edit = df_edit_source.copy()
+            # 데이터 에디터에 표시하기 위해 날짜 형식 변환
+            df_edit['date'] = df_edit['date'].dt.date
             
-            # 데이터 에디터
+            st.info("💡 표에서 직접 수정하거나 행을 선택해 Delete 키로 삭제하세요. 수정 후 반드시 저장 버튼을 눌러주세요.")
+            
+            # 데이터 에디터 활용
             edited_df = st.data_editor(
                 df_edit[['member', 'date', 'quantity']],
                 num_rows="dynamic",
-                key="data_editor",
-                hide_index=True
+                key="usage_editor",
+                hide_index=True,
+                use_container_width=True
             )
 
             if st.button("💾 변경사항 최종 저장"):
-                final_df = edited_df.dropna(subset=['member', 'date'])
+                try:
+                    # 1. 시트 연결 및 초기화
+                    spreadsheet = get_connection()
+                    worksheet = spreadsheet.worksheet("usage") # sheet1 대신 usage로 통일
+                    worksheet.clear()
 
-                if final_df.empty:
-                    st.warning("⚠️ 저장할 데이터가 없습니다.")
-                else:
-                    try:
-                        # Gspread 연결
-                        spreadsheet = get_connection()
-                        worksheet = spreadsheet.sheet1
+                    # 2. 데이터 정제 (빈 줄 제외 및 날짜 문자열화)
+                    final_df = edited_df.dropna(subset=['member', 'date']).copy()
+                    final_df['date'] = final_df['date'].astype(str)
+                    final_df['quantity'] = final_df['quantity'].fillna(0).astype(int)
 
-                        # 기존 데이터 삭제
-                        worksheet.clear()
+                    # 3. 구글 시트 업데이트
+                    data_to_upload = [final_df.columns.values.tolist()] + final_df.values.tolist()
+                    worksheet.update(data_to_upload)
 
-                        # 저장용 데이터 처리
-                        save_df = final_df[['member', 'date', 'quantity']].copy()
-                        save_df['date'] = save_df['date'].astype(str)
+                    # 4. 상태 갱신
+                    st.cache_data.clear()
+                    st.session_state['df_all'] = load_all_data() # 최신 데이터 재로드
+                    st.success("✅ 데이터베이스에 성공적으로 반영되었습니다!")
+                    st.rerun() # 페이지 새로고침
 
-                        # 전체 데이터 업데이트
-                        worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
-
-                        # 캐시 무효화
-                        st.cache_data.clear()
-
-                        # 🔹 최신 데이터 session_state에 저장
-                        st.session_state['df_all'] = load_all_data()
-
-                        st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
-
-                        # 🔹 차트 및 테이블 즉시 갱신 위해 페이지 강제 재실행
-                        st.experimental_rerun()
-
-                    except Exception as e:
-                        st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
+                except Exception as e:
+                    st.error(f"❌ 저장 중 오류 발생: {e}")
         else:
             st.info("수정할 기록이 없습니다.")
     else:
