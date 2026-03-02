@@ -9,16 +9,10 @@ import json
 from google.oauth2 import service_account
 
 sa_json_str = st.secrets["GCP"]["service_account"].strip()
-
-try:
-    sa_info = json.loads(sa_json_str)
-except json.JSONDecodeError as e:
-    st.error(f"GCP JSON 파싱 실패: {e}")
-    st.stop()
-
+sa_info = json.loads(sa_json_str)
 credentials = service_account.Credentials.from_service_account_info(sa_info)
-st.success("GCP 인증 성공!")
-st.write("GCP project:", sa_info["project_id"])
+
+st.write("GCP Project:", sa_info["project_id"])
 
 # =========================================================
 # [1] 페이지 설정 및 레이아웃 최적화
