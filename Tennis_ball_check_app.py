@@ -12,7 +12,7 @@ sa_json_str = st.secrets["GCP"]["service_account"].strip()
 sa_info = json.loads(sa_json_str)
 credentials = service_account.Credentials.from_service_account_info(sa_info)
 
-st.write("GCP Project:", sa_info["project_id"])
+print("GCP project:", sa_info["project_id"])  # 화면에는 안 뜸
 
 # =========================================================
 # [1] 페이지 설정 및 레이아웃 최적화
