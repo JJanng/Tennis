@@ -530,13 +530,17 @@ with col_b:
             )
 
 with tab2:
+    # 세션 상태 초기화 (KeyError 방지)
+    if 'df_all' not in st.session_state:
+        st.session_state['df_all'] = load_all_data()
+
     if st.session_state.get('authenticated', False):
         st.subheader("📝 기록 수정 및 삭제")
         
         if not st.session_state['df_all'].empty:
             # 원본 복사 및 정렬
             df_edit = st.session_state['df_all'].copy()
-            df_edit['date'] = df_edit['date'].dt.date  # datetime → date
+            df_edit['date'] = pd.to_datetime(df_edit['date']).dt.date  # datetime → date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
 
             st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 '💾 변경사항 최종 저장' 버튼을 누르세요.")
@@ -578,6 +582,9 @@ with tab2:
 
                         st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
 
+                        # 🔹 차트 및 테이블 즉시 갱신 위해 페이지 강제 재실행
+                        st.experimental_rerun()
+
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
         else:
@@ -585,7 +592,6 @@ with tab2:
     else:
         st.warning("🔒 이 기능은 관리자 전용입니다.")
         st.info("왼쪽 사이드바에서 '관리자 모드 활성화' 후 비밀번호를 입력해 주세요.")
-
 
 # 하단 다운로드 버튼 (df_all이 정의되어 있으므로 오류 없이 작동)
 if not df_all.empty:
