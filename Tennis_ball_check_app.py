@@ -189,9 +189,22 @@ df_all = load_all_data()
 members_list = load_members()
 
 
-# 세션 상태 초기화
+# 초기화
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
+
+# 사이드바에서 체크
+with st.sidebar:
+    st.header("⚙️ 시스템 설정")
+    is_admin = st.checkbox("관리자 권한 활성화", value=st.session_state['authenticated'])
+
+    if is_admin and not st.session_state['authenticated']:
+        admin_pwd = st.text_input("관리자 비밀번호", type="password")
+        if admin_pwd == "2612":
+            st.session_state['authenticated'] = True
+            st.success("🔓 관리자 인증 성공")
+        elif admin_pwd:
+            st.error("🔑 비밀번호가 일치하지 않습니다.")
 
 
 # 앱 헤더 출력
@@ -533,18 +546,14 @@ with tab2:
     # 세션 상태 초기화
     if 'df_all' not in st.session_state:
         st.session_state['df_all'] = load_all_data()
-    if 'refresh_flag' not in st.session_state:
-        st.session_state['refresh_flag'] = False
+    if 'authenticated' not in st.session_state:
+        st.session_state['authenticated'] = False
 
-    if st.session_state.get('authenticated', False):
+    if st.session_state['authenticated']:
         st.subheader("📝 기록 수정 및 삭제")
 
-        # 저장 후 플래그 체크
-        if st.session_state['refresh_flag']:
-            st.session_state['df_all'] = load_all_data()
-            st.session_state['refresh_flag'] = False
-
         if not st.session_state['df_all'].empty:
+            # 편집용 데이터 준비
             df_edit = st.session_state['df_all'].copy()
             df_edit['date'] = pd.to_datetime(df_edit['date']).dt.date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
@@ -564,15 +573,21 @@ with tab2:
                     st.warning("⚠️ 저장할 데이터가 없습니다.")
                 else:
                     try:
+                        # Gspread 저장
                         spreadsheet = get_connection()
                         worksheet = spreadsheet.sheet1
                         worksheet.clear()
+
                         save_df = final_df[['member', 'date', 'quantity']].copy()
                         save_df['date'] = save_df['date'].astype(str)
                         worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
 
+                        # 캐시 무효화
                         st.cache_data.clear()
-                        st.session_state['refresh_flag'] = True  # 🔹 플래그 ON
+
+                        # 🔹 바로 session_state에 반영 → 차트/테이블 자동 갱신
+                        st.session_state['df_all'] = final_df.copy()
+
                         st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
 
                     except Exception as e:
@@ -582,6 +597,21 @@ with tab2:
     else:
         st.warning("🔒 이 기능은 관리자 전용입니다.")
         st.info("왼쪽 사이드바에서 '관리자 모드 활성화' 후 비밀번호를 입력해 주세요.")
+
+# =========================================================
+# 차트 그리기 (Tab2 아래 또는 Tab1에서)
+# =========================================================
+if 'df_all' in st.session_state and not st.session_state['df_all'].empty:
+    df_chart = st.session_state['df_all'].copy()
+    
+    # 일별 기록 차트
+    st.subheader("📊 일별 기록")
+    st.line_chart(df_chart.groupby('date')['quantity'].sum())
+
+    # 월별 추이 차트
+    st.subheader("📈 월간 추이")
+    df_chart['month'] = pd.to_datetime(df_chart['date']).dt.to_period('M')
+    st.line_chart(df_chart.groupby('month')['quantity'].sum())
 
 # 하단 다운로드 버튼 (df_all이 정의되어 있으므로 오류 없이 작동)
 if not df_all.empty:
