@@ -559,7 +559,7 @@ with tab2:
                 hide_index=True
             )
 
-            # 저장 버튼
+            # 🔹 관리자 기록 수정 저장 버튼 (최신 Streamlit 호환)
             if st.button("💾 변경사항 최종 저장"):
                 # 필수 컬럼 체크 및 결측값 제거
                 final_df = edited_df.dropna(subset=['member', 'date'])
@@ -567,11 +567,11 @@ with tab2:
                 if final_df.empty:
                     st.warning("⚠️ 저장할 데이터가 없습니다. 모든 행이 제거되었거나 필수 항목이 누락되었습니다.")
                 else:
-                    # Gspread 연결
-                    spreadsheet = get_connection()
-                    worksheet = spreadsheet.sheet1  # 첫 번째 시트 사용
-                    
                     try:
+                        # Gspread 연결
+                        spreadsheet = get_connection()
+                        worksheet = spreadsheet.sheet1  # 첫 번째 시트 사용
+                        
                         # 기존 데이터 삭제 (전체 시트 초기화)
                         worksheet.clear()
                         
@@ -581,15 +581,14 @@ with tab2:
                         
                         # 헤더 포함 전체 데이터 업데이트
                         worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
-
-                        # 🔹 캐시 무효화 후 데이터 재로드
+                        
+                        # 🔹 캐시 무효화
                         st.cache_data.clear()
-                        df_all = load_all_data()
-                        members_list = load_members()
-
+                        
+                        # 🔹 사용자 안내
                         st.success("✅ 데이터베이스 업데이트 완료!")
-                        st.experimental_rerun()  # 페이지 즉시 갱신
-
+                        st.info("ℹ️ 변경사항이 즉시 반영되지 않을 경우, 브라우저 새로고침(F5)을 해주세요.")
+                        
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
         else:
