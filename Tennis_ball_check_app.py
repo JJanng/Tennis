@@ -189,22 +189,9 @@ df_all = load_all_data()
 members_list = load_members()
 
 
-# 초기화
+# 세션 상태 초기화
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
-
-# 사이드바에서 체크
-with st.sidebar:
-    st.header("⚙️ 시스템 설정")
-    is_admin = st.checkbox("관리자 권한 활성화", value=st.session_state['authenticated'])
-
-    if is_admin and not st.session_state['authenticated']:
-        admin_pwd = st.text_input("관리자 비밀번호", type="password")
-        if admin_pwd == "2612":
-            st.session_state['authenticated'] = True
-            st.success("🔓 관리자 인증 성공")
-        elif admin_pwd:
-            st.error("🔑 비밀번호가 일치하지 않습니다.")
 
 
 # 앱 헤더 출력
@@ -543,27 +530,22 @@ with col_b:
             )
 
 with tab2:
-    # 세션 상태 초기화
+    # 세션 상태 초기화 (KeyError 방지)
     if 'df_all' not in st.session_state:
         st.session_state['df_all'] = load_all_data()
-    if 'refresh_flag' not in st.session_state:
-        st.session_state['refresh_flag'] = False
 
     if st.session_state.get('authenticated', False):
         st.subheader("📝 기록 수정 및 삭제")
-
-        # 저장 후 플래그 체크
-        if st.session_state['refresh_flag']:
-            st.session_state['df_all'] = load_all_data()
-            st.session_state['refresh_flag'] = False
-
+        
         if not st.session_state['df_all'].empty:
+            # 원본 복사 및 정렬
             df_edit = st.session_state['df_all'].copy()
-            df_edit['date'] = pd.to_datetime(df_edit['date']).dt.date
+            df_edit['date'] = pd.to_datetime(df_edit['date']).dt.date  # datetime → date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
 
             st.info("💡 표에서 직접 내용을 수정하거나 행을 삭제한 후 '💾 변경사항 최종 저장' 버튼을 누르세요.")
-
+            
+            # 데이터 에디터
             edited_df = st.data_editor(
                 df_edit[['member', 'date', 'quantity']],
                 num_rows="dynamic",
@@ -573,20 +555,35 @@ with tab2:
 
             if st.button("💾 변경사항 최종 저장"):
                 final_df = edited_df.dropna(subset=['member', 'date'])
+
                 if final_df.empty:
                     st.warning("⚠️ 저장할 데이터가 없습니다.")
                 else:
                     try:
+                        # Gspread 연결
                         spreadsheet = get_connection()
                         worksheet = spreadsheet.sheet1
+
+                        # 기존 데이터 삭제
                         worksheet.clear()
+
+                        # 저장용 데이터 처리
                         save_df = final_df[['member', 'date', 'quantity']].copy()
                         save_df['date'] = save_df['date'].astype(str)
+
+                        # 전체 데이터 업데이트
                         worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
 
+                        # 캐시 무효화
                         st.cache_data.clear()
-                        st.session_state['refresh_flag'] = True  # 🔹 플래그 ON
+
+                        # 🔹 최신 데이터 session_state에 저장
+                        st.session_state['df_all'] = load_all_data()
+
                         st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
+
+                        # 🔹 차트 및 테이블 즉시 갱신 위해 페이지 강제 재실행
+                        st.experimental_rerun()
 
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
