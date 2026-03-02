@@ -582,7 +582,13 @@ with tab2:
                         # 헤더 포함 전체 데이터 업데이트
                         worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
 
+                        # 🔹 캐시 무효화 후 데이터 재로드
+                        st.cache_data.clear()
+                        df_all = load_all_data()
+                        members_list = load_members()
+
                         st.success("✅ 데이터베이스 업데이트 완료!")
+                        st.experimental_rerun()  # 페이지 즉시 갱신
 
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
