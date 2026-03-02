@@ -586,13 +586,8 @@ with tab2:
 
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
-                    finally:
-                        conn.close()
-        else:
-            st.info("수정할 기록이 없습니다.")
-    else:
-        st.warning("🔒 이 기능은 관리자 전용입니다.")
-        st.info("왼쪽 사이드바에서 '관리자 모드 활성화' 후 비밀번호를 입력해 주세요.")
+
+
 
 # 하단 다운로드 버튼 (df_all이 정의되어 있으므로 오류 없이 작동)
 if not df_all.empty:
