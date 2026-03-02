@@ -202,81 +202,71 @@ st.markdown('<p class="main-title">🎾 테니스 볼 사용량 관리 시스템
 # =========================================================
 with st.sidebar:
     st.header("⚙️ 시스템 설정")
-    is_admin = st.checkbox("관리자 권한 활성화", help="기록 삭제 및 회원 관리를 위해 체크하세요.")
+    
+    # 관리자 모드 체크박스
+    is_admin = st.checkbox("관리자 권한 활성화", help="기록 삭제 및 회원 관리를 위해 체크하세요.",
+                           value=st.session_state.get('authenticated', False))
     
     if is_admin:
-        admin_pwd = st.text_input("관리자 비밀번호", type="password")
-        if admin_pwd == "2612":
+        # 비밀번호 입력
+        if 'admin_pwd_input' not in st.session_state:
+            st.session_state['admin_pwd_input'] = ''
+        
+        st.session_state['admin_pwd_input'] = st.text_input(
+            "관리자 비밀번호", 
+            type="password",
+            value=st.session_state['admin_pwd_input']
+        )
+        
+        if st.session_state['admin_pwd_input'] == "2612":
             st.session_state['authenticated'] = True
             st.success("🔓 관리자 인증 성공")
-            
-            # --- 회원 명단 관리 섹션 ---
+        elif st.session_state['admin_pwd_input']:
+            st.session_state['authenticated'] = False
+            st.error("🔑 비밀번호가 일치하지 않습니다.")
+        
+        # --- 관리자 기능: 회원 명단 관리 ---
+        if st.session_state.get('authenticated', False):
             with st.expander("👤 회원 명단 수정", expanded=False):
+                # 신규 회원 등록
                 new_member_name = st.text_input("신규 등록 성함", placeholder="예: 홍길동")
                 if st.button("회원 추가하기", use_container_width=True):
                     if new_member_name.strip():
                         current_m = load_members()
                         if new_member_name.strip() not in current_m:
-                            # 새 회원을 포함한 데이터프레임 구성
                             updated_m_df = pd.DataFrame({"member": current_m + [new_member_name.strip()]})
-                            # [PATCH] 마스터 테이블은 반드시 update(덮어쓰기) 수행
                             spreadsheet = get_connection()
                             members_ws = spreadsheet.worksheet("members")
-
                             members_ws.clear()
-
-                            members_ws.update(
-                                [updated_m_df.columns.values.tolist()] +
-                                updated_m_df.values.tolist()
-                            )
-
-                            st.cache_data.clear() # 캐시 강제 무효화
+                            members_ws.update([updated_m_df.columns.values.tolist()] + updated_m_df.values.tolist())
+                            st.cache_data.clear()
                             st.success(f"{new_member_name}님 등록 완료!")
-                            st.rerun()
                         else:
                             st.error("이미 등록된 이름입니다.")
                 
                 st.divider()
                 
-                # 회원 삭제 로직
+                # 회원 삭제
                 members_for_del = load_members()
                 selected_del_mem = st.selectbox("영구 삭제할 이름", ["선택"] + members_for_del)
                 if st.button("회원 정보 삭제", type="secondary", use_container_width=True):
                     if selected_del_mem != "선택":
-                        # 1. 명단에서 제거
                         updated_m_df = pd.DataFrame({"member": [m for m in members_for_del if m != selected_del_mem]})
                         spreadsheet = get_connection()
                         members_ws = spreadsheet.worksheet("members")
-
                         members_ws.clear()
+                        members_ws.update([updated_m_df.columns.values.tolist()] + updated_m_df.values.tolist())
 
-                        members_ws.update(
-                            [updated_m_df.columns.values.tolist()] +
-                            updated_m_df.values.tolist()
-                        )
-
-                        # 2. [중요] 사용 기록 시트에서도 해당 데이터 제거
-                        spreadsheet = get_connection()
+                        # 사용 기록 삭제
                         usage_ws = spreadsheet.worksheet("usage")
-
                         data = usage_ws.get_all_records()
                         df_usage = pd.DataFrame(data)
-
                         filtered_usage = df_usage[df_usage['member'] != selected_del_mem]
-
                         usage_ws.clear()
-                        usage_ws.update(
-                            [filtered_usage.columns.values.tolist()] +
-                            filtered_usage.values.tolist()
-                        )
-                      
+                        usage_ws.update([filtered_usage.columns.values.tolist()] + filtered_usage.values.tolist())
+
                         st.cache_data.clear()
                         st.warning(f"{selected_del_mem}님 관련 모든 정보 파기 완료")
-                        st.rerun()
-        else:
-            st.session_state['authenticated'] = False
-            if admin_pwd:
-                st.error("🔑 비밀번호가 일치하지 않습니다.")
     else:
         st.session_state['authenticated'] = False
 
@@ -543,9 +533,9 @@ with tab2:
     if st.session_state.get('authenticated', False):
         st.subheader("📝 기록 수정 및 삭제")
         
-        if not df_all.empty:
+        if not st.session_state['df_all'].empty:
             # 원본 복사 및 정렬
-            df_edit = df_all.copy()
+            df_edit = st.session_state['df_all'].copy()
             df_edit['date'] = df_edit['date'].dt.date  # datetime → date
             df_edit = df_edit.sort_values(by=['date', 'member'], ascending=[False, True]).reset_index(drop=True)
 
@@ -583,11 +573,8 @@ with tab2:
                         # 캐시 무효화
                         st.cache_data.clear()
 
-                        # 🔹 최신 데이터 재로드
-                        df_all_new = load_all_data()
-
-                        # 🔹 기존 전역 df_all 덮어쓰기
-                        df_all = df_all_new.copy()
+                        # 🔹 최신 데이터 session_state에 저장
+                        st.session_state['df_all'] = load_all_data()
 
                         st.success("✅ 데이터베이스 업데이트 완료! 차트 및 테이블이 갱신됩니다.")
 
