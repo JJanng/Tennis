@@ -6,18 +6,27 @@ import plotly.express as px
 import gspread
 from google.oauth2.service_account import Credentials
 import json
+from google.oauth2 import service_account
 
-# 1️⃣ 멀티라인 문자열 그대로 읽어오기
+
+# 1️⃣ Streamlit secrets에서 JSON 문자열 가져오기
 sa_json_str = st.secrets["GCP"]["service_account"]
 
 # 2️⃣ 문자열 앞뒤 공백 제거
 sa_json_str = sa_json_str.strip()
 
-# 3️⃣ json.loads로 파싱
-sa_info = json.loads(sa_json_str)
+# 3️⃣ JSON 파싱
+try:
+    sa_info = json.loads(sa_json_str)
+except json.JSONDecodeError:
+    st.error("GCP 서비스 계정 JSON 파싱 실패! Cloud Secrets에서 JSON 형식 확인 필요.")
+    st.stop()
+
+# 4️⃣ Credentials 생성
+credentials = service_account.Credentials.from_service_account_info(sa_info)
 
 # ✅ 확인
-st.write(sa_info["project_id"])
+st.write("GCP project:", sa_info["project_id"])
 
 # =========================================================
 # [1] 페이지 설정 및 레이아웃 최적화
