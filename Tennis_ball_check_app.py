@@ -8,22 +8,17 @@ from google.oauth2.service_account import Credentials
 import json
 from google.oauth2 import service_account
 
-
-# 1️⃣ Streamlit secrets에서 JSON 문자열 가져오기
-sa_json_str = st.secrets["GCP"]["service_account"]
+sa_json_str = st.secrets["GCP"]["service_account"].strip()
 
 # 2️⃣ 문자열 앞뒤 공백 제거
 sa_json_str = sa_json_str.strip()
 
-# 3️⃣ JSON 파싱
 try:
     sa_info = json.loads(sa_json_str)
-except json.JSONDecodeError:
-    st.error("GCP 서비스 계정 JSON 파싱 실패! Cloud Secrets에서 JSON 형식 확인 필요.")
-    st.stop()
-
-# 4️⃣ Credentials 생성
-credentials = service_account.Credentials.from_service_account_info(sa_info)
+    credentials = service_account.Credentials.from_service_account_info(sa_info)
+    st.success("GCP 인증 성공!")
+except json.JSONDecodeError as e:
+    st.error(f"GCP JSON 파싱 실패: {e}")
 
 # ✅ 확인
 st.write("GCP project:", sa_info["project_id"])
