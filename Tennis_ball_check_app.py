@@ -370,178 +370,91 @@ with tab1:
             summary_display = monthly_summary.sort_values('연월_정렬', ascending=False)
             st.table(summary_display.rename(columns={'연월_표시': '날짜', 'quantity': '합계'})[['날짜', '합계']].set_index('날짜'))
 
+# --- col_b 차트 영역 ---
 with col_b:
-            st.subheader("📊 일별 기록")
-            df_day = df_all.groupby(['date', 'member'])['quantity'].sum().reset_index()
-            df_day = df_day.sort_values('date')
-            df_day['date_str'] = df_day['date'].dt.strftime('%m-%d')
-            
-            # 데이터 개수에 따른 동적 설정 계산 (X축)
-            num_unique_days = len(df_day['date_str'].unique())
-            dynamic_font_size = 16 if num_unique_days <= 5 else 12
-            dynamic_bargap = 0.7 if num_unique_days <= 2 else 0.3
+    # 최신 데이터 가져오기
+    df_all = st.session_state.get('df_all', pd.DataFrame())
+    if not df_all.empty:
+        # 일별 기록
+        st.subheader("📊 일별 기록")
+        df_day = df_all.groupby(['date', 'member'])['quantity'].sum().reset_index()
+        df_day = df_day.sort_values('date')
+        df_day['date_str'] = pd.to_datetime(df_day['date']).dt.strftime('%m-%d')
 
-            # --- Y축 동적 눈금(dtick) 계산 추가 ---
-            if not df_day.empty:
-                max_day_val = df_day['quantity'].max()
-                if max_day_val <= 5:
-                    day_dtick = 1
-                elif max_day_val <= 15:
-                    day_dtick = 2
-                elif max_day_val <= 30:
-                    day_dtick = 5
-                else:
-                    day_dtick = 10
-                day_y_range = [0, max_day_val * 1.2] # 상단 여백 확보
-            else:
-                day_dtick = 1
-                day_y_range = [0, 10]
+        # 데이터 개수에 따른 동적 설정 계산
+        num_unique_days = len(df_day['date_str'].unique())
+        dynamic_font_size = 16 if num_unique_days <= 5 else 12
+        dynamic_bargap = 0.7 if num_unique_days <= 2 else 0.3
 
-            fig_day = px.bar(df_day, x='date_str', y='quantity', color='member', 
-                            barmode='group', text='quantity', height=320)
-            
-            fig_day.update_traces(
-                textposition='outside', 
-                textfont=dict(size=14, family="Arial Black", color="black"),
-                cliponaxis=False
-            )
-            
-            fig_day.update_layout(
-                    xaxis_title=None, 
-                    yaxis_title=None,
-                    xaxis={
-                        'type': 'category', 
-                        'fixedrange': True,
-                        'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}
-                    },
-                    yaxis={
-                        'fixedrange': True, 
-                        'dtick': day_dtick,
-                        'range': day_y_range,
-                        'gridcolor': '#DCDCDC',
-                        'showgrid': True,
-                        'title': None
-                    },
-                    bargap=dynamic_bargap,
-                    margin=dict(l=5, r=10, t=40, b=10), # 왼쪽 여백 축소로 공간 확보
-                    paper_bgcolor='rgba(0,0,0,0)', 
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    dragmode=False,
-                    hovermode='x unified',
-                    showlegend=True,
-                    # --- 범례(Legend) 설정 수정 ---
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="left",
-                        x=-0.05,            # 왼쪽으로 살짝 더 밀어서 공간을 더 확보 (음수값 활용)
-                        title=None,
-                        font=dict(size=11), # 글자 크기를 10으로 줄여 잘림 방지
-                        
-                        # 고정 비율(entrywidth) 대신 가로 간격을 직접 조절합니다.
-                        itemwidth=30,       # 범례 아이콘(색상박스) 너비 축소
-                        itemsizing="constant",
-                        
-                        # 항목 사이의 여백을 조절 (열을 늘리는 핵심)
-                        # entrywidth를 지우면 이름 길이에 맞춰 다닥다닥 붙게 됩니다.
-                    )
-                )
+        # Y축 동적 dtick 계산
+        max_day_val = df_day['quantity'].max() if not df_day.empty else 1
+        if max_day_val <= 5: day_dtick = 1
+        elif max_day_val <= 15: day_dtick = 2
+        elif max_day_val <= 30: day_dtick = 5
+        else: day_dtick = 10
+        day_y_range = [0, max_day_val * 1.2]
 
-            st.plotly_chart(
-                fig_day, 
-                width='stretch', 
-                config={'displayModeBar': False, 'scrollZoom': False}
-            )
-          
-            st.subheader("📈 월간 추이")
-            # 데이터 정렬 확인 및 X축 형식 변경
-            monthly_display = monthly_summary.sort_values('연월_정렬').copy()
-            
-            if not monthly_display.empty:
-                # X축 표시 형식을 '26/02 형태로 변경
-                # '연월_정렬'은 '2026-02' 형식이므로 이를 슬라이싱하여 변환합니다.
-                monthly_display['short_date'] = monthly_display['연월_정렬'].apply(
-                    lambda x: f"'{x[2:4]}/{x[5:7]}"
-                )
+        fig_day = px.bar(df_day, x='date_str', y='quantity', color='member', 
+                         barmode='group', text='quantity', height=320)
+        fig_day.update_traces(
+            textposition='outside',
+            textfont=dict(size=14, family="Arial Black", color="black"),
+            cliponaxis=False
+        )
+        fig_day.update_layout(
+            xaxis_title=None,
+            yaxis_title=None,
+            xaxis={'type': 'category', 'fixedrange': True, 'tickfont': {'size': dynamic_font_size, 'family': "Arial Black"}},
+            yaxis={'fixedrange': True, 'dtick': day_dtick, 'range': day_y_range, 'gridcolor': '#DCDCDC', 'showgrid': True},
+            bargap=dynamic_bargap,
+            margin=dict(l=5, r=10, t=40, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            dragmode=False,
+            hovermode='x unified',
+            showlegend=True,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=-0.05, title=None, font=dict(size=11), itemwidth=30, itemsizing="constant")
+        )
+        st.plotly_chart(fig_day, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
-                # 데이터 수에 따른 동적 글자 크기 계산
-                num_months = len(monthly_display)
-                if num_months <= 6:
-                    month_font_size = 14
-                elif num_months <= 12:
-                    month_font_size = 12
-                else:
-                    month_font_size = 10
+        # 월간 추이
+        st.subheader("📈 월간 추이")
+        monthly_display = monthly_summary.sort_values('연월_정렬').copy()
+        if not monthly_display.empty:
+            monthly_display['short_date'] = monthly_display['연월_정렬'].apply(lambda x: f"'{x[2:4]}/{x[5:7]}")
+            num_months = len(monthly_display)
+            month_font_size = 14 if num_months <= 6 else 12 if num_months <= 12 else 10
+            max_val = monthly_display['quantity'].max()
+            dynamic_dtick = 2 if max_val <= 10 else 5 if max_val <= 20 else 10 if max_val <= 30 else 20
+            y_range = [0, max_val * 1.25]
+        else:
+            month_font_size = 14
+            dynamic_dtick = 1
+            y_range = [0, 10]
 
-                # 1. 최대 수량에 따른 적절한 그리드 간격(dtick) 계산
-                max_val = monthly_display['quantity'].max()
-                if max_val <= 10: dynamic_dtick = 2
-                elif max_val <= 20: dynamic_dtick = 5
-                elif max_val <= 30: dynamic_dtick = 10
-                else: dynamic_dtick = 20
-                
-                y_range = [0, max_val * 1.25]
-            else:
-                month_font_size = 14
-                dynamic_dtick = 1
-                y_range = [0, 10]
+        fig_month = px.line(monthly_display, x='short_date', y='quantity', markers=True, text='quantity', height=320)
+        fig_month.update_traces(
+            line_color='#2E7D32',
+            line_width=3,
+            marker=dict(size=12, symbol="circle", color="#2E7D32", line=dict(width=2, color="white")),
+            textposition="top center",
+            cliponaxis=False,
+            textfont=dict(size=15, family="Arial Black", color="black")
+        )
+        fig_month.update_layout(
+            xaxis={'type': 'category', 'fixedrange': True, 'tickfont': {'size': month_font_size, 'family': "Arial Black"}, 'showgrid': False, 'showline': True, 'linewidth': 2, 'linecolor': '#A5D6A7', 'mirror': True},
+            yaxis={'fixedrange': True, 'showgrid': True, 'dtick': dynamic_dtick, 'gridcolor': '#DCDCDC', 'gridwidth': 1, 'griddash': 'dot', 'zeroline': True, 'zerolinecolor': '#A5D6A7', 'showline': True, 'linewidth': 2, 'linecolor': '#A5D6A7', 'mirror': True, 'range': y_range, 'title': None},
+            margin=dict(l=5, r=10, t=60, b=10),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(255,255,255,0.5)',
+            dragmode=False,
+            hovermode='x unified'
+        )
+        st.plotly_chart(fig_month, width='stretch', config={'displayModeBar': False, 'scrollZoom': False})
 
-            # x축을 새로 만든 'short_date'로 설정
-            fig_month = px.line(monthly_display, x='short_date', y='quantity', 
-                                markers=True, text='quantity', height=320)
-            
-            fig_month.update_traces(
-                line_color='#2E7D32', 
-                line_width=3,
-                marker=dict(size=12, symbol="circle", color="#2E7D32", line=dict(width=2, color="white")), 
-                textposition="top center", 
-                cliponaxis=False,
-                textfont=dict(size=15, family="Arial Black", color="black")
-            )
-            
-            fig_month.update_layout(
-                xaxis_title=None, 
-                yaxis_title=None,
-                xaxis={
-                    'type': 'category', 
-                    'fixedrange': True,
-                    'tickfont': {'size': month_font_size, 'family': "Arial Black"}, # 동적 폰트 적용
-                    'showgrid': False,
-                    'showline': True,
-                    'linewidth': 2,
-                    'linecolor': '#A5D6A7',
-                    'mirror': True
-                },
-                yaxis={
-                    'fixedrange': True, 
-                    'showgrid': True,
-                    'dtick': dynamic_dtick,
-                    'gridcolor': '#DCDCDC',
-                    'gridwidth': 1,
-                    'griddash': 'dot',
-                    'zeroline': True,
-                    'zerolinecolor': '#A5D6A7',
-                    'showline': True,
-                    'linewidth': 2,
-                    'linecolor': '#A5D6A7',
-                    'mirror': True,
-                    'range': y_range,
-                    'title': None
-                },
-                margin=dict(l=5, r=10, t=60, b=10),
-                paper_bgcolor='rgba(0,0,0,0)', 
-                plot_bgcolor='rgba(255,255,255,0.5)',
-                dragmode=False,
-                hovermode='x unified'
-            )
-            
-            st.plotly_chart(
-                fig_month, 
-                width='stretch', 
-                config={'displayModeBar': False, 'scrollZoom': False}
-            )
-
+    else:
+        st.info("⚠️ 기록이 없습니다.")
+        
 with tab2:
     # 세션 상태 초기화
     if 'df_all' not in st.session_state:
@@ -598,20 +511,6 @@ with tab2:
         st.warning("🔒 이 기능은 관리자 전용입니다.")
         st.info("왼쪽 사이드바에서 '관리자 모드 활성화' 후 비밀번호를 입력해 주세요.")
 
-# =========================================================
-# 차트 그리기 (Tab2 아래 또는 Tab1에서)
-# =========================================================
-if 'df_all' in st.session_state and not st.session_state['df_all'].empty:
-    df_chart = st.session_state['df_all'].copy()
-    
-    # 일별 기록 차트
-    st.subheader("📊 일별 기록")
-    st.line_chart(df_chart.groupby('date')['quantity'].sum())
-
-    # 월별 추이 차트
-    st.subheader("📈 월간 추이")
-    df_chart['month'] = pd.to_datetime(df_chart['date']).dt.to_period('M')
-    st.line_chart(df_chart.groupby('month')['quantity'].sum())
 
 # 하단 다운로드 버튼 (df_all이 정의되어 있으므로 오류 없이 작동)
 if not df_all.empty:
