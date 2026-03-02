@@ -569,7 +569,7 @@ with tab2:
                 else:
                     # Gspread 연결
                     spreadsheet = get_connection()
-                    worksheet = spreadsheet.sheet1  # 첫 번째 시트 사용 (필요시 다른 시트 선택 가능)
+                    worksheet = spreadsheet.sheet1  # 첫 번째 시트 사용
                     
                     try:
                         # 기존 데이터 삭제 (전체 시트 초기화)
@@ -579,11 +579,10 @@ with tab2:
                         save_df = final_df[['member', 'date', 'quantity']].copy()
                         save_df['date'] = save_df['date'].astype(str)  # 문자열 변환
                         
-                        # 헤더 포함해서 전체 데이터 업데이트
+                        # 헤더 포함 전체 데이터 업데이트
                         worksheet.update([save_df.columns.values.tolist()] + save_df.values.tolist())
 
                         st.success("✅ 데이터베이스 업데이트 완료!")
-                        st.experimental_rerun()  # 변경사항 반영 위해 페이지 새로고침
 
                     except Exception as e:
                         st.error(f"❌ 데이터베이스 저장 중 오류가 발생했습니다: {e}")
