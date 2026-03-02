@@ -97,8 +97,12 @@ conn = st.connection("gsheets", type=GSheetsConnection)
 def load_all_data():
     """구글 시트의 usage 워크시트에서 데이터를 로드하고 전처리합니다."""
     try:
-        df = conn.read(spreadsheet=st.secrets["connections"]["gsheets"]["spreadsheet"], worksheet="usage")
+        # spreadsheet 인자를 명시하지 않아도 secrets.toml의 내용을 자동으로 참조합니다.
+        # 만약 계속 400 에러가 난다면 아래처럼 'spreadsheet' 인자를 제거하고 호출해보세요.
+        df = conn.read(worksheet="usage", ttl="0") 
+        
         if df is not None and not df.empty:
+            # (기존 데이터 처리 로직 동일...)
             df['date'] = pd.to_datetime(df['date']).dt.normalize()
             df['연월_표시'] = df['date'].dt.strftime('%Y년 %m월')
             df['연월_정렬'] = df['date'].dt.strftime('%Y-%m')
